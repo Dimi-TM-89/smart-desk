@@ -39,7 +39,7 @@ smart-desk/
 1. Clone the repo on the Pi (we work on the Pi through VS Code **Remote-SSH**):
    ```bash
    cd ~
-   git clone <repo-url> smart-desk
+   git clone https://github.com/Dimi-TM-89/smart-desk.git
    cd smart-desk
    ```
 2. Run the one-time setup (installs packages, enables I²C/SPI/PWM, creates the
