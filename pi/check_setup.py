@@ -118,6 +118,9 @@ def hardware_pwm():
 
 if __name__ == "__main__":
     print("Smart Desk – setup check\n")
+    if sys.prefix == sys.base_prefix:
+        print("  WARNING: the virtual environment is not active.")
+        print("           Run first:  source .venv/bin/activate\n")
     check("Python packages", python_packages)
     check("AI packages (optional)", ai_packages)
     check("I2C / SPI enabled", interfaces)
