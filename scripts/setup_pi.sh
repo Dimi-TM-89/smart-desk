@@ -45,7 +45,14 @@ pip install --upgrade pip
 pip install -r requirements.txt
 if [[ $INSTALL_AI -eq 1 ]]; then
     echo "==> Installing AI packages (this takes a while)"
-    pip install -r requirements-ai.txt
+    # Download to the SD card instead of /tmp (which can be a small RAM disk)
+    export TMPDIR="$REPO/.pip-tmp"
+    mkdir -p "$TMPDIR"
+    # CPU-only PyTorch first – the default build pulls GBs of NVIDIA/CUDA libraries
+    pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+    pip install --no-cache-dir -r requirements-ai.txt
+    rm -rf "$TMPDIR"
+    unset TMPDIR
 fi
 
 echo "==> Configuring Mosquitto (accept connections from the Pico)"

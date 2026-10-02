@@ -7,6 +7,7 @@ settings.toml
 __pycache__/
 *.py[cod]
 .venv/
+.pip-tmp/
 venv/
 env/
 

@@ -1,3 +1,11 @@
-# AI posture detection (large download, includes PyTorch)
+# AI posture detection.
+#
+# IMPORTANT: install the CPU-only PyTorch build FIRST, otherwise pip pulls the
+# CUDA build with several GB of NVIDIA libraries that the Pi cannot use
+# (and the SD card runs full). scripts/setup_pi.sh does this for you:
+#
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements-ai.txt
+#
 ultralytics
 ncnn
