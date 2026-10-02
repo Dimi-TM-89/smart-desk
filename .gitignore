@@ -1,0 +1,29 @@
+# Secrets – never commit these
+.env
+pico/settings.toml
+settings.toml
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# AI models (downloaded / exported on the Pi, too large for git)
+*.pt
+*.onnx
+*_ncnn_model/
+
+# Logs and runtime files
+*.log
+nohup.out
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Office lock files
+~$*

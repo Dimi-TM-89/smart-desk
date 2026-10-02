@@ -1,0 +1,18 @@
+# Core packages for the Raspberry Pi 5 (installed by scripts/setup_pi.sh)
+
+# GPIO through CircuitPython/Blinka, as used in the course (Pi 5 needs lgpio)
+adafruit-blinka
+gpiod
+lgpio
+
+# Sensors and display
+adafruit-circuitpython-bh1750
+adafruit-circuitpython-bmp280
+adafruit-circuitpython-mcp3xxx
+adafruit-circuitpython-ssd1306
+
+# Communication, storage, configuration
+paho-mqtt>=2.0
+mariadb
+requests
+python-dotenv

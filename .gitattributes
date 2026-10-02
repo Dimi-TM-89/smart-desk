@@ -1,0 +1,8 @@
+# Always store text files with LF line endings, so scripts written on
+# Windows still run on the Pi (CRLF breaks bash scripts).
+* text=auto eol=lf
+
+*.png  binary
+*.jpg  binary
+*.docx binary
+*.pdf  binary

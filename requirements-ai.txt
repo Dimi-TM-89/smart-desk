@@ -1,0 +1,3 @@
+# AI posture detection (large download, includes PyTorch)
+ultralytics
+ncnn

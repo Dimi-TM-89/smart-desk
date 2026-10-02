@@ -1,0 +1,8 @@
+# Copy to CIRCUITPY/settings.toml and fill in. Do NOT commit the real file.
+CIRCUITPY_WIFI_SSID = "your-wifi-name"
+CIRCUITPY_WIFI_PASSWORD = "your-wifi-password"
+
+# IP address of the Raspberry Pi 5 (shown by pi/check_setup.py)
+MQTT_BROKER = "192.168.1.xxx"
+MQTT_PORT = 1883
+MQTT_TOPIC = "desk/chair/occupied"
