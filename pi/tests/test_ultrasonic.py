@@ -1,5 +1,5 @@
 """
-test_ultrasonic.py – Test the HC-SR04 ultrasonic sensor (TRIG GPIO20, ECHO GPIO21).
+test_ultrasonic.py – Test the HC-SR04 ultrasonic sensor (TRIG GPIO14, ECHO GPIO15).
 
 What it does:
     1. measures the empty scene for a baseline (keep your hand away!)
@@ -35,6 +35,7 @@ def main():
             print("FAIL: no echo at all.")
             print("  - check TRIG/ECHO are not swapped and the sensor has 5 V and GND")
             print("  - check the voltage divider on ECHO (GND side of the divider!)")
+            print("  - GPIO14/15 are the UART pins: raspi-config > Interface > Serial port must be off")
             return
         print(f"Baseline: {baseline:.1f} cm (presence below "
               f"{baseline - config.Limits.PRESENCE_DROP_CM:.1f} cm)\n")

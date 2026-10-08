@@ -78,13 +78,14 @@ All pin numbers (BCM) live in [`pi/config.py`](pi/config.py). Change them
 | Function | GPIO |
 |---|---|
 | I²C SDA / SCL (BH1750, BMP280) | 2 / 3 |
-| SPI SCLK / MOSI / MISO | 11 / 10 / 9 |
+| SPI0 SCLK / MOSI / MISO (MCP3008) | 11 / 10 / 9 |
 | MCP3008 CS | 24 |
-| OLED CS / DC / RST | 5 / 6 / 4 |
+| SPI1 SCLK / MOSI (OLED pins "SCL" / "SDA") | 21 / 20 |
+| OLED DC / RES (no CS pin) | 6 / 4 |
 | Desk lamp LEDs (hardware PWM) | 12 |
-| RGB LED R / G / B | 13 / 19 / 26 |
+| RGB LED R / G / B | 13 / 5 / 26 |
 | Stepper IN1–IN4 | 17 / 27 / 22 / 23 |
-| Ultrasonic TRIG / ECHO | 20 / 21 |
+| Ultrasonic TRIG / ECHO | 14 / 15 |
 | Fan relay | 16 |
 | Fan button | 25 |
 
@@ -92,6 +93,11 @@ Pico: seat button on **GP15** (to GND, internal pull-up).
 
 Hardware PWM uses the single-channel overlay `dtoverlay=pwm,pin=12,func=4`
 (set by the setup script), so GPIO13 stays free for the RGB LED.
+
+The OLED module has no CS pin, so it cannot share SPI0 with the MCP3008. It
+runs on SPI1 (`dtoverlay=spi1-1cs`, also set by the setup script). That
+overlay also claims GPIO18 and GPIO19: do not use them. GPIO14/15 (ultrasonic)
+are the UART pins, so keep the serial port disabled in `raspi-config`.
 
 ## MQTT topics
 

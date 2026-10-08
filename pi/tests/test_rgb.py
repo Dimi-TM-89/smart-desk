@@ -1,5 +1,5 @@
 """
-test_rgb.py – Test the RGB posture LED (R=GPIO13, G=GPIO19, B=GPIO26).
+test_rgb.py – Test the RGB posture LED (R=GPIO13, G=GPIO5, B=GPIO26).
 
 What it does: shows red, green and blue for 1 s each (twice), then lets
 you type a colour name.

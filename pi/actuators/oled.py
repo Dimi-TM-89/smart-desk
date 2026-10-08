@@ -1,15 +1,14 @@
 """
-oled.py – SSD1306 128×64 OLED on the SPI bus (local dashboard).
+oled.py – SSD1306 128×64 OLED on SPI1 (local dashboard).
 
 Drawing is done on a PIL image in memory, which is then sent to the display
-in one go (as in the course, lesson 6). The OLED shares the SPI bus with the
-MCP3008; each device has its own chip-select pin (OLED: GPIO5).
+in one go (as in the course, lesson 6).
 
-If your OLED module has NO CS pin, it reacts to every SPI transfer, including
-the ones meant for the MCP3008, and shows garbage. The fix from the course is
-to put the OLED on the separate SPI1 bus (GPIO 19/20/21) – but those pins are
-used by the RGB LED and the ultrasonic sensor in our pin plan. Check this with
-test_oled.py --with-adc before the wiring is final.
+Our module has 6 pins: GND VCC SCL SDA RES DC – and NO CS pin. Despite the
+names, SCL/SDA are SPI clock/data, not I2C. Without CS the display listens to
+every transfer on its bus, so it cannot share SPI0 with the MCP3008. It gets
+the SPI1 bus (GPIO21 clock, GPIO20 data) on its own, as in the course
+("OLED SPI SSD1306 without CS"). Pass cs_gpio=None for such a module.
 """
 
 import adafruit_ssd1306
@@ -23,11 +22,17 @@ class Oled:
     """Text display: show up to ~5 lines of text."""
 
     def __init__(self, spi, cs_gpio, dc_gpio, rst_gpio, width=128, height=64):
-        """Create the display on an existing SPI bus and clear it."""
-        self.cs = digitalio.DigitalInOut(board_pin(cs_gpio))
+        """Create the display on an existing SPI bus and clear it.
+
+        cs_gpio is None for a module without a CS pin (ours).
+        """
+        self.cs = digitalio.DigitalInOut(board_pin(cs_gpio)) if cs_gpio is not None else None
         self.dc = digitalio.DigitalInOut(board_pin(dc_gpio))
         self.rst = digitalio.DigitalInOut(board_pin(rst_gpio))
-        self.display = adafruit_ssd1306.SSD1306_SPI(width, height, spi, self.dc, self.rst, self.cs)
+        # cs may be None: the library's SPIDevice supports that, its type hint does not
+        self.display = adafruit_ssd1306.SSD1306_SPI(
+            width, height, spi, self.dc, self.rst, self.cs  # pyright: ignore[reportArgumentType]
+        )
         self.width = width
         self.height = height
         self.font = ImageFont.load_default()
@@ -65,4 +70,5 @@ class Oled:
         """Clear the display and release the pins."""
         self.clear()
         for pin in (self.cs, self.dc, self.rst):
-            pin.deinit()
+            if pin is not None:
+                pin.deinit()

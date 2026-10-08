@@ -33,12 +33,18 @@ class Pins:
     I2C_SDA = 2
     I2C_SCL = 3
 
-    # SPI bus (MCP3008 + OLED): fixed hardware pins
+    # SPI0 bus (MCP3008 only): fixed hardware pins
     SPI_SCLK = 11
     SPI_MOSI = 10
     SPI_MISO = 9
     MCP3008_CS = 24          # software chip select
-    OLED_CS = 5
+
+    # SPI1 bus (OLED only, dtoverlay=spi1-1cs). Our OLED module has no CS pin,
+    # so it would react to the MCP3008 traffic on SPI0 – it gets its own bus.
+    # The overlay also claims GPIO19 (MISO1) and GPIO18 (CE0): keep them free.
+    OLED_SCLK = 21           # module pin "SCL" (it is SPI clock, not I2C!)
+    OLED_MOSI = 20           # module pin "SDA" (it is SPI data, not I2C!)
+    OLED_CS = None           # module has no CS pin
     OLED_DC = 6
     OLED_RST = 4
 
@@ -47,15 +53,16 @@ class Pins:
 
     # RGB posture LED (common cathode, plain digital outputs)
     RGB_RED = 13
-    RGB_GREEN = 19
+    RGB_GREEN = 5
     RGB_BLUE = 26
 
     # Stepper motor 28BYJ-48 via ULN2003
     STEPPER = (17, 27, 22, 23)   # IN1, IN2, IN3, IN4
 
     # Ultrasonic sensor HC-SR04 (voltage divider on ECHO!)
-    US_TRIG = 20
-    US_ECHO = 21
+    # GPIO14/15 are the UART pins: keep "Serial port" disabled in raspi-config.
+    US_TRIG = 14
+    US_ECHO = 15
 
     # Fan
     FAN_RELAY = 16           # relay input is active LOW

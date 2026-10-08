@@ -52,10 +52,12 @@ def ai_packages():
 
 
 def interfaces():
-    """I2C and SPI device files exist (enabled in raspi-config)."""
-    missing = [d for d in ("/dev/i2c-1", "/dev/spidev0.0") if not os.path.exists(d)]
+    """I2C, SPI0 (MCP3008) and SPI1 (OLED) device files exist."""
+    missing = [d for d in ("/dev/i2c-1", "/dev/spidev0.0", "/dev/spidev1.0")
+               if not os.path.exists(d)]
     if missing:
-        raise RuntimeError("not found: " + ", ".join(missing) + " – enable I2C/SPI and reboot")
+        raise RuntimeError("not found: " + ", ".join(missing)
+                           + " – run scripts/setup_pi.sh (I2C, SPI, dtoverlay=spi1-1cs) and reboot")
 
 
 def i2c_devices():
@@ -123,7 +125,7 @@ if __name__ == "__main__":
         print("           Run first:  source .venv/bin/activate\n")
     check("Python packages", python_packages)
     check("AI packages (optional)", ai_packages)
-    check("I2C / SPI enabled", interfaces)
+    check("I2C / SPI0 / SPI1 enabled", interfaces)
     check("Hardware PWM GPIO12", hardware_pwm)
     check("I2C scan", i2c_devices)
     check("Mosquitto broker", mqtt_broker)
