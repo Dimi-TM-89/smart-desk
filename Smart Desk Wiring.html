@@ -1,0 +1,786 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Smart Desk Wiring</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: a bench reference. Sticky Pi 5 header map on the left (desktop), one card per part on the right, in test order. */
+:root {
+  --bg: #f1f3ef; --surface: #ffffff; --panel: #e7ebe5; --fg: #17201b; --muted: #59655d; --line: #cdd5cd;
+  --accent: #1c6a46; --accent-soft: #dcefe4; --gold: #b37d16; --warn: #a83d14; --warn-bg: #fbe8de; --ok: #1c6a46;
+  --w-red: #d22f2a; --w-orange: #e27718; --w-black: #232a26; --w-blue: #2a5fc7; --w-yellow: #d8ad00;
+  --w-purple: #7a3fbf; --w-white: #ffffff; --w-green: #2c9a4e; --casing: #3c4741;
+  --f-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1412; --surface: #161d19; --panel: #1e2722; --fg: #e2e9e4; --muted: #96a29a; --line: #2d3a33;
+  --accent: #63c48f; --accent-soft: #1b3326; --gold: #dcab4a; --warn: #ff8f63; --warn-bg: #3a1e14; --ok: #63c48f;
+  --w-red: #ff5d55; --w-orange: #ff9c42; --w-black: #c4ccc7; --w-blue: #6e9cff; --w-yellow: #f0cb3c;
+  --w-purple: #b490ff; --w-white: #f4f4f4; --w-green: #58d083; --casing: #000000; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1412; --surface: #161d19; --panel: #1e2722; --fg: #e2e9e4; --muted: #96a29a; --line: #2d3a33;
+  --accent: #63c48f; --accent-soft: #1b3326; --gold: #dcab4a; --warn: #ff8f63; --warn-bg: #3a1e14; --ok: #63c48f;
+  --w-red: #ff5d55; --w-orange: #ff9c42; --w-black: #c4ccc7; --w-blue: #6e9cff; --w-yellow: #f0cb3c;
+  --w-purple: #b490ff; --w-white: #f4f4f4; --w-green: #58d083; --casing: #000000; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--f-body); padding-inline: 16px; padding-block: 0 48px; }
+.wrap { max-width: 1280px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--f-display); font-stretch: 85%; text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(1.9rem, 4vw, 2.6rem); font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 1.45rem; font-weight: 750; }
+h3 { font-size: 1.02rem; font-weight: 700; font-stretch: 90%; }
+p { margin: 0; }
+code, .mono { font-family: var(--f-mono); font-size: 0.9em; }
+.muted { color: var(--muted); }
+a { color: var(--accent); }
+
+header.top { padding-block: 32px 20px; display: grid; gap: 10px; }
+.eyebrow { font: 600 0.72rem/1 var(--f-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.lede { max-width: 68ch; color: var(--muted); }
+
+.change { border: 1px solid var(--warn); background: var(--warn-bg); border-radius: 10px; padding: 14px 16px; display: grid; gap: 6px; max-width: 900px; }
+.change b { color: var(--warn); }
+.change ul { margin: 0; padding-left: 1.1em; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (min-width: 1040px) { .layout { grid-template-columns: 460px minmax(0, 1fr); } aside.side { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow: auto; } }
+
+aside.side { display: grid; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.side-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.mapsvg { width: 100%; min-width: 360px; height: auto; display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.8rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; border: 1.5px solid var(--casing); }
+.progress { display: grid; gap: 2px; }
+.progress a { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 6px; text-decoration: none; color: var(--fg); font-size: 0.88rem; }
+.progress a:hover, .progress a.current { background: var(--panel); }
+.progress .n { font: 600 0.75rem var(--f-mono); color: var(--muted); }
+.state { font: 500 0.7rem var(--f-mono); padding: 2px 7px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.state.wired { border-color: var(--gold); color: var(--gold); }
+.state.passed { background: var(--accent-soft); border-color: var(--ok); color: var(--ok); }
+
+main { display: grid; gap: 22px; min-width: 0; }
+section.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; display: grid; gap: 16px; min-width: 0; scroll-margin-top: 12px; }
+.card-head { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; align-items: start; }
+.num { font: 800 1.9rem/1 var(--f-display); font-stretch: 75%; color: var(--gold); min-width: 1.6ch; }
+.card-head .sub { grid-column: 2; color: var(--muted); }
+.run { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cmd { font: 500 0.85rem var(--f-mono); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; min-width: 0; overflow-wrap: anywhere; }
+button { font: 500 0.82rem var(--f-body); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.parts { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 0.8rem; border: 1px solid var(--line); border-radius: 99px; padding: 2px 10px; background: var(--bg); display: inline-flex; align-items: center; gap: 6px; }
+.bands { display: inline-flex; gap: 2px; }
+.bands i { width: 4px; height: 12px; border-radius: 1px; display: inline-block; border: 0.5px solid var(--casing); }
+
+.diagram { display: grid; gap: 6px; }
+.diagram .scroll svg { width: 100%; min-width: 560px; height: auto; display: block; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tabs button[aria-selected="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+
+table.wires { width: 100%; border-collapse: collapse; font-size: 0.86rem; min-width: 560px; }
+table.wires th { text-align: left; font: 600 0.7rem var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+table.wires td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.wires td:first-child { font-family: var(--f-mono); font-size: 0.82rem; white-space: nowrap; }
+table.wires .pin { font-family: var(--f-mono); font-weight: 600; }
+.sw { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.sw i { width: 18px; height: 6px; border-radius: 3px; border: 1px solid var(--casing); display: inline-block; }
+
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.box { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.box h3 { font-size: 0.92rem; }
+.box ul, .box ol { margin: 0; padding-left: 1.15em; display: grid; gap: 4px; }
+.box.warn { border-color: var(--warn); background: var(--warn-bg); }
+.box.warn h3 { color: var(--warn); }
+.box.pass { border-color: var(--ok); background: var(--accent-soft); }
+.box.pass h3 { color: var(--ok); }
+
+.checks { display: flex; gap: 18px; flex-wrap: wrap; padding-top: 4px; border-top: 1px dashed var(--line); padding-block: 12px 0; }
+.checks label { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; font-size: 0.9rem; }
+.checks input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+/* SVG roles */
+svg text { font-family: var(--f-body); fill: var(--fg); }
+.cbody { fill: var(--panel); stroke: var(--line); }
+.ctitle { font: 700 14px var(--f-display); font-stretch: 85%; }
+.chead { font: 600 10.5px var(--f-mono); letter-spacing: 0.08em; fill: var(--muted); }
+.plabel { font: 500 12.5px var(--f-mono); }
+.pad { fill: var(--gold); }
+.dest { fill: var(--surface); stroke: var(--line); }
+.dmain { font-weight: 600; font-size: 13px; }
+.dsub { fill: var(--muted); font-size: 12px; }
+.opentxt { fill: var(--muted); font-size: 12.5px; font-style: italic; }
+.openline { stroke: var(--muted); stroke-dasharray: 3 4; stroke-width: 1.5; fill: none; }
+.casing { stroke: var(--casing); stroke-width: 6.5; stroke-linecap: round; fill: none; }
+.wire { stroke-width: 3.6; stroke-linecap: round; fill: none; }
+.part { fill: var(--surface); stroke: var(--fg); stroke-width: 1.4; }
+.ptxt { font: 600 11.5px var(--f-mono); }
+.sym { stroke: var(--fg); stroke-width: 1.6; fill: none; }
+.symfill { fill: var(--fg); }
+.symtxt { font-size: 12.5px; }
+.symsmall { font-size: 11.5px; fill: var(--muted); }
+.node { fill: var(--fg); }
+.w-red { stroke: var(--w-red); } .w-orange { stroke: var(--w-orange); } .w-black { stroke: var(--w-black); }
+.w-blue { stroke: var(--w-blue); } .w-yellow { stroke: var(--w-yellow); } .w-purple { stroke: var(--w-purple); }
+.w-white { stroke: var(--w-white); } .w-green { stroke: var(--w-green); }
+.hdr { fill: var(--panel); stroke: var(--line); }
+.pinc { stroke: var(--casing); stroke-width: 1.2; }
+.pin-3v3 { fill: var(--w-orange); } .pin-5v { fill: var(--w-red); } .pin-gnd { fill: var(--w-black); }
+.pin-used { fill: var(--gold); } .pin-res { fill: var(--panel); stroke: var(--muted); stroke-dasharray: 2 2; } .pin-free { fill: var(--surface); stroke: var(--muted); }
+.pnum { font: 600 8.5px var(--f-mono); fill: var(--bg); text-anchor: middle; pointer-events: none; }
+.pnum.on-light { fill: var(--fg); }
+.mlabel { font-size: 12.5px; }
+.mlabel .g { fill: var(--muted); font-family: var(--f-mono); font-size: 10.5px; }
+.mlabel.res { fill: var(--muted); font-style: italic; }
+.cap { font: 600 10px var(--f-mono); letter-spacing: 0.06em; fill: var(--muted); }
+g.mp { transition: opacity .2s; }
+svg.sel g.mp { opacity: 0.28; }
+svg.sel g.mp.hi { opacity: 1; }
+g.mp .ring { fill: none; stroke: var(--accent); stroke-width: 3; opacity: 0; }
+g.mp.hi .ring { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { g.mp { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <span class="eyebrow">IoT Essentials · Smart Desk · Raspberry Pi 5 + Pico 2 W</span>
+    <h1>Smart Desk Wiring</h1>
+    <p class="lede">Wire one part at a time, in this order, and run its test from <code>pi/tests/</code> before you add the next one. Pin numbers below are the physical header pins (1–40), with the GPIO number that <code>pi/config.py</code> uses next to them.</p>
+    <div class="change" role="note">
+      <p><b>Pin plan changed on 8 October.</b> Our OLED has no CS pin (GND VCC SCL SDA RES DC), so it moved to its own SPI1 bus. Use this page, not the table in the report (section 6.2), until the report is updated.</p>
+      <ul>
+        <li>OLED: SCL → pin 40 (GPIO21), SDA → pin 38 (GPIO20). OLED CS is gone.</li>
+        <li>RGB green: GPIO19 → GPIO5 (pin 29).</li>
+        <li>HC-SR04: TRIG GPIO20 → GPIO14 (pin 8), ECHO GPIO21 → GPIO15 (pin 10).</li>
+        <li>GPIO18 and GPIO19 now belong to SPI1: leave them free.</li>
+      </ul>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="side" id="side" aria-label="Header map and progress">
+      <div class="side-head">
+        <h2>Pi 5 header</h2>
+        <button type="button" id="showAll">Show all pins</button>
+      </div>
+      <p class="muted" style="font-size:.85rem">Pin 1 is at the end of the header farthest from the USB and Ethernet ports, on the row toward the middle of the board. The even pins (2, 4, …) run along the board edge.</p>
+      <div class="scroll"><svg class="mapsvg" id="map" role="img" aria-label="Raspberry Pi 5 40-pin header with the Smart Desk pin assignment"></svg></div>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--w-orange)"></i>3.3 V</span>
+        <span><i class="dot" style="background:var(--w-red)"></i>5 V</span>
+        <span><i class="dot" style="background:var(--w-black)"></i>GND</span>
+        <span><i class="dot" style="background:var(--gold)"></i>used signal</span>
+        <span><i class="dot" style="background:var(--panel);border-style:dashed"></i>reserved, keep free</span>
+      </div>
+      <nav class="progress" id="progress" aria-label="Steps"></nav>
+    </aside>
+
+    <main id="main">
+      <section class="card" id="start">
+        <div class="card-head"><span class="num">0</span><h2>Before you start</h2><p class="sub">Five minutes here saves a Pi.</p></div>
+        <div class="cols">
+          <div class="box warn">
+            <h3>Rules for every step</h3>
+            <ul>
+              <li>Change wiring only with the Pi <b>off and unplugged</b>: <code>sudo shutdown -h now</code>, wait for the green LED to stop, then pull the USB-C cable.</li>
+              <li>GPIO pins are <b>3.3 V only</b>. Never connect 5 V to a GPIO pin. The only 5 V signal (HC-SR04 ECHO) goes through a voltage divider.</li>
+              <li>Every part shares the same GND.</li>
+              <li>Check each wire against the header map before you plug the power back in.</li>
+            </ul>
+          </div>
+          <div class="box">
+            <h3>Set up the breadboard rails once</h3>
+            <ul>
+              <li>Left rail <b>+</b> = 3.3 V from pin 1 (orange wire), left rail <b>−</b> = GND from pin 6 (black).</li>
+              <li>Right rail <b>+</b> = 5 V from pin 2 (red), right rail <b>−</b> = GND from pin 9 (black).</li>
+              <li>Put a piece of tape on the 5 V rail so nobody mixes it up with 3.3 V.</li>
+              <li>On long breadboards the rails are often split halfway (a gap in the red/blue line). Bridge the gap with a short wire if you need both halves.</li>
+            </ul>
+          </div>
+          <div class="box">
+            <h3>Wire colours used on this page</h3>
+            <ul id="colourKey"></ul>
+          </div>
+        </div>
+      </section>
+      <div id="steps" style="display:grid;gap:22px"></div>
+    </main>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- Raspberry Pi 5 header (physical pin -> name) ---------- */
+  const PI = {
+    1: ["3V3", "3v3"], 2: ["5V", "5v"], 3: ["GPIO2", "io"], 4: ["5V", "5v"], 5: ["GPIO3", "io"], 6: ["GND", "gnd"],
+    7: ["GPIO4", "io"], 8: ["GPIO14", "io"], 9: ["GND", "gnd"], 10: ["GPIO15", "io"], 11: ["GPIO17", "io"], 12: ["GPIO18", "io"],
+    13: ["GPIO27", "io"], 14: ["GND", "gnd"], 15: ["GPIO22", "io"], 16: ["GPIO23", "io"], 17: ["3V3", "3v3"], 18: ["GPIO24", "io"],
+    19: ["GPIO10", "io"], 20: ["GND", "gnd"], 21: ["GPIO9", "io"], 22: ["GPIO25", "io"], 23: ["GPIO11", "io"], 24: ["GPIO8", "io"],
+    25: ["GND", "gnd"], 26: ["GPIO7", "io"], 27: ["GPIO0", "io"], 28: ["GPIO1", "io"], 29: ["GPIO5", "io"], 30: ["GND", "gnd"],
+    31: ["GPIO6", "io"], 32: ["GPIO12", "io"], 33: ["GPIO13", "io"], 34: ["GND", "gnd"], 35: ["GPIO19", "io"], 36: ["GPIO16", "io"],
+    37: ["GPIO26", "io"], 38: ["GPIO20", "io"], 39: ["GND", "gnd"], 40: ["GPIO21", "io"]
+  };
+
+  /* What each pin does in the Smart Desk (same as pi/config.py) */
+  const USE = {
+    1: "3.3 V rail", 2: "5 V rail", 6: "GND rail", 9: "GND rail",
+    3: "I²C SDA", 5: "I²C SCL",
+    7: "OLED RES", 31: "OLED DC", 38: "OLED SDA (SPI1 data)", 40: "OLED SCL (SPI1 clock)",
+    23: "SPI0 SCLK → MCP3008", 19: "SPI0 MOSI → MCP3008", 21: "SPI0 MISO ← MCP3008", 18: "MCP3008 CS",
+    32: "Desk lamp (PWM)", 33: "RGB red", 29: "RGB green", 37: "RGB blue",
+    36: "Fan relay IN1", 22: "Fan button",
+    11: "Stepper IN1", 13: "Stepper IN2", 15: "Stepper IN3", 16: "Stepper IN4",
+    8: "HC-SR04 TRIG", 10: "HC-SR04 ECHO"
+  };
+  const RESERVED = {
+    12: "SPI1 CE0 – keep free", 35: "SPI1 MISO – keep free", 24: "SPI0 CE0 – keep free", 26: "SPI0 CE1 – keep free",
+    27: "ID EEPROM – don't use", 28: "ID EEPROM – don't use"
+  };
+
+  const RAIL = {
+    "3v3": { label: "3.3 V rail", sub: "from pin 1", pins: [1], wire: "orange" },
+    "5v": { label: "5 V rail", sub: "from pin 2", pins: [2], wire: "red" },
+    "gnd": { label: "GND rail", sub: "from pin 6 / 9", pins: [6, 9], wire: "black" }
+  };
+
+  const WIRE = {
+    red: "red – 5 V", orange: "orange – 3.3 V", black: "black – GND", blue: "blue – I²C SDA",
+    yellow: "yellow – I²C SCL", purple: "purple – SPI clock / data", white: "white – chip select, DC, RES",
+    green: "green – other GPIO signals"
+  };
+
+  const RES = {
+    "220 Ω": ["red", "red", "brown"], "1 kΩ": ["brown", "black", "red"], "10 kΩ": ["brown", "black", "orange"]
+  };
+  const BAND = { red: "#c62828", brown: "#6d4c2f", black: "#111", orange: "#ef7d14" };
+
+  /* ---------- Steps (test order of pi/tests/README.md) ---------- */
+  const STEPS = [
+    {
+      id: "i2c", title: "I²C sensors: BH1750 + BMP280", sub: "Desk light and room temperature on one shared I²C bus.",
+      test: "python pi/tests/test_i2c.py",
+      parts: ["BH1750 module", "BMP280 module", "8 jumper wires"],
+      diagrams: [
+        { title: "BH1750", rows: [
+          { from: "VCC / VIN", to: { rail: "3v3" }, wire: "orange" },
+          { from: "GND", to: { rail: "gnd" }, wire: "black" },
+          { from: "SCL", to: { pi: 5 }, wire: "yellow" },
+          { from: "SDA", to: { pi: 3 }, wire: "blue" },
+          { from: "ADDR", to: { open: "leave open → address 0x23" } } ] },
+        { title: "BMP280", rows: [
+          { from: "VCC / VIN", to: { rail: "3v3" }, wire: "orange" },
+          { from: "GND", to: { rail: "gnd" }, wire: "black" },
+          { from: "SCL / SCK", to: { pi: 5 }, wire: "yellow" },
+          { from: "SDA / SDI", to: { pi: 3 }, wire: "blue" },
+          { from: "CSB / CS", to: { open: "leave open (to 3.3 V if the scan finds nothing)" } },
+          { from: "SDO", to: { open: "leave open → 0x76 or 0x77" } } ] }
+      ],
+      before: [
+        "Both sensors on 3.3 V. Many BMP280 boards are not 5 V tolerant.",
+        "Pin 3 = SDA, pin 5 = SCL. Swapped wires give an empty scan, no damage.",
+        "Both sensors share pins 3 and 5: run SDA and SCL to two breadboard rows and plug both sensors into those rows."
+      ],
+      pass: "The scan shows 0x23 and 0x76 or 0x77. Covering the BH1750 lowers the lux, a finger on the BMP280 raises the temperature.",
+      fail: [
+        "Empty scan: check 3.3 V/GND on the modules and that I²C is on (<code>python pi/check_setup.py</code>).",
+        "BMP280 at the other address: the test tells you which value to put in <code>BMP280_ADDRESS</code>."
+      ]
+    },
+    {
+      id: "adc", title: "MCP3008 + potentiometer + LDR", sub: "Analog inputs over SPI0: the light threshold and the window light.",
+      test: "python pi/tests/test_adc.py",
+      parts: ["MCP3008 chip", "10 kΩ potentiometer", "LDR", "10 kΩ resistor", "~12 jumper wires"],
+      chip: true,
+      diagrams: [
+        { title: "MCP3008", rows: [
+          { from: "16 VDD", to: { rail: "3v3" }, wire: "orange" },
+          { from: "15 VREF", to: { rail: "3v3" }, wire: "orange" },
+          { from: "14 AGND", to: { rail: "gnd" }, wire: "black" },
+          { from: "13 CLK", to: { pi: 23 }, wire: "purple" },
+          { from: "12 DOUT", to: { pi: 21 }, wire: "purple" },
+          { from: "11 DIN", to: { pi: 19 }, wire: "purple" },
+          { from: "10 CS", to: { pi: 18 }, wire: "white" },
+          { from: "9 DGND", to: { rail: "gnd" }, wire: "black" },
+          { from: "1 CH0", to: { text: "potentiometer, middle leg" }, wire: "green" },
+          { from: "2 CH1", to: { text: "LDR / 10 kΩ junction" }, wire: "green" } ] }
+      ],
+      extra: "analog",
+      before: [
+        "Notch (or dot) of the chip at the top: pin 1 is top left, pin 16 top right. The chip sits across the middle gap of the breadboard.",
+        "VDD and VREF on <b>3.3 V</b>, not 5 V. On 5 V the chip sends 5 V back into MISO (pin 21).",
+        "CLK pin 23, DOUT pin 21, DIN pin 19: DOUT goes to MISO, DIN to MOSI."
+      ],
+      pass: "Turning the potentiometer goes smoothly from about 0 to 1023. Covering the LDR lowers the window value, a torch raises it.",
+      fail: [
+        "Always 0 or 1023: check VDD/VREF/AGND/DGND and the CS wire on pin 18.",
+        "LDR works the wrong way round: swap the LDR and the 10 kΩ resistor."
+      ]
+    },
+    {
+      id: "oled", title: "OLED display (SSD1306, no CS)", sub: "Local dashboard on its own SPI1 bus.",
+      test: "python pi/tests/test_oled.py", test2: "python pi/tests/test_oled.py --with-adc",
+      parts: ["SSD1306 OLED 128×64, 6 pins", "6 jumper wires"],
+      diagrams: [
+        { title: "OLED (6 pins)", rows: [
+          { from: "GND", to: { rail: "gnd" }, wire: "black" },
+          { from: "VCC", to: { rail: "3v3" }, wire: "orange" },
+          { from: "SCL", to: { pi: 40 }, wire: "purple", note: "SPI clock, not I²C" },
+          { from: "SDA", to: { pi: 38 }, wire: "purple", note: "SPI data, not I²C" },
+          { from: "RES", to: { pi: 7 }, wire: "white" },
+          { from: "DC", to: { pi: 31 }, wire: "white" } ] }
+      ],
+      before: [
+        "Despite their names, SCL and SDA go to <b>pins 40 and 38</b>. On pins 3/5 (I²C) the display stays black.",
+        "SPI1 must be on: <code>dtoverlay=spi1-1cs</code> in <code>/boot/firmware/config.txt</code> (the updated <code>setup_pi.sh</code> adds it), then reboot. <code>check_setup.py</code> checks for <code>/dev/spidev1.0</code>.",
+        "VCC on 3.3 V."
+      ],
+      pass: "A frame around the whole screen, then a running counter. With <code>--with-adc</code>, the potentiometer value follows on the OLED without garbage.",
+      fail: [
+        "\"/dev/spidev1.0 not found\": the SPI1 overlay is missing, or you did not reboot.",
+        "Only half a frame: the display is 128×32; set <code>OLED_HEIGHT = 32</code> in config.py."
+      ]
+    },
+    {
+      id: "lamp", title: "Desk lamp: 2 LEDs on PWM", sub: "Dimmable lamp on the hardware PWM pin.",
+      test: "python pi/tests/test_lamp.py",
+      parts: ["2 red LEDs", "2 × 220 Ω", "4 jumper wires"],
+      diagrams: [
+        { title: "Lamp LEDs", rows: [
+          { from: "LED 1 long leg +", to: { pi: 32 }, wire: "green", part: "220 Ω" },
+          { from: "LED 1 short leg −", to: { rail: "gnd" }, wire: "black" },
+          { from: "LED 2 long leg +", to: { pi: 32 }, wire: "green", part: "220 Ω" },
+          { from: "LED 2 short leg −", to: { rail: "gnd" }, wire: "black" } ] }
+      ],
+      extra: "lamp",
+      before: [
+        "Long leg (+, anode) toward the resistor and pin 32. The short leg sits on the flat side of the rim and goes to GND.",
+        "Each LED gets its own 220 Ω resistor. Both resistors start from the same breadboard row that pin 32 feeds.",
+        "Hardware PWM needs <code>dtoverlay=pwm,pin=12,func=4</code> (already set by <code>setup_pi.sh</code>)."
+      ],
+      pass: "Both LEDs fade up and down smoothly, without flicker, and follow the brightness you type.",
+      fail: [
+        "One LED stays dark: it is the wrong way round. Turn it.",
+        "\"could not start PWM\": overlay missing or no reboot. <code>ls /sys/class/pwm/</code> should show a pwmchip."
+      ]
+    },
+    {
+      id: "rgb", title: "RGB posture LED", sub: "Green = good posture, red = bad, blue = nobody in view.",
+      test: "python pi/tests/test_rgb.py",
+      parts: ["RGB LED, 4 legs (diffused)", "3 × 220 Ω", "4 jumper wires"],
+      diagrams: [
+        { title: "RGB LED", rows: [
+          { from: "longest leg", to: { rail: "gnd" }, wire: "black", note: "common cathode" },
+          { from: "R", to: { pi: 33 }, wire: "green", part: "220 Ω" },
+          { from: "G", to: { pi: 29 }, wire: "green", part: "220 Ω" },
+          { from: "B", to: { pi: 37 }, wire: "green", part: "220 Ω" } ] }
+      ],
+      checkFirst: [
+        "Put the longest leg on the GND rail.",
+        "Hold one other leg, through a 220 Ω resistor, against the 3.3 V rail.",
+        "It lights: <b>common cathode</b>, as the code expects. Note the colour of each leg while you are at it.",
+        "Nothing: move the longest leg to 3.3 V and the resistor to GND. If it lights now, the LED is <b>common anode</b> and the code needs a one-line change. Tell the software lead before wiring further."
+      ],
+      before: [
+        "Usual leg order, flat side first: R, common (longest), G, B. The colour check above is what counts.",
+        "Each colour has its own 220 Ω resistor; the common leg has none."
+      ],
+      pass: "Red → green → blue, twice, in that order. Typing a colour name shows it.",
+      fail: [
+        "Colours in the wrong order: swap the wires of those two colours on the GPIO side.",
+        "Nothing lights: check the common leg is on GND, and re-do the common anode check."
+      ]
+    },
+    {
+      id: "fan", title: "Fan relay + fan button", sub: "Active-low relay switches the fan; the button overrides it.",
+      test: "python pi/tests/test_fan.py",
+      parts: ["Relay board (5 V, active low)", "Small DC fan", "Push button", "~7 jumper wires"],
+      diagrams: [
+        { title: "Relay board", rows: [
+          { from: "VCC", to: { rail: "5v" }, wire: "red" },
+          { from: "GND", to: { rail: "gnd" }, wire: "black" },
+          { from: "IN1", to: { pi: 36 }, wire: "green" },
+          { from: "JD-VCC jumper", to: { open: "leave the jumper on" } } ] },
+        { title: "Relay contacts", rows: [
+          { from: "COM1", to: { text: "5 V rail, or + of the fan's own supply" }, wire: "red" },
+          { from: "NO1", to: { text: "fan + (red fan wire)" }, wire: "red" },
+          { from: "fan − (black)", to: { text: "GND rail, or − of the fan's own supply" }, wire: "black" } ] },
+        { title: "Fan button", rows: [
+          { from: "leg A", to: { pi: 22 }, wire: "green" },
+          { from: "leg B (diagonal)", to: { rail: "gnd" }, wire: "black" } ] }
+      ],
+      before: [
+        "Only IN1, VCC and GND of the relay board go to the Pi. The fan current runs through the relay contact, never through a GPIO.",
+        "A small 5 V fan may run from the Pi's 5 V rail. Anything bigger gets its own supply on COM1.",
+        "4-leg push button: use two diagonally opposite legs, then the orientation cannot be wrong. No resistor needed (internal pull-up)."
+      ],
+      pass: "The relay clicks on and off 3 times (its LED follows), then every button press toggles the fan.",
+      fail: [
+        "Relay stays on while the program says OFF: some boards don't switch off at 3.3 V. Remove the JD-VCC jumper, give JD-VCC 5 V and VCC 3.3 V.",
+        "Button does nothing: you used two legs that are always connected. Use the diagonal pair."
+      ]
+    },
+    {
+      id: "stepper", title: "Stepper sunshade (28BYJ-48 + ULN2003)", sub: "Closes the shade when the window light is too strong.",
+      test: "python pi/tests/test_stepper.py",
+      parts: ["28BYJ-48 motor", "ULN2003 driver board", "6 jumper wires"],
+      diagrams: [
+        { title: "ULN2003 board", rows: [
+          { from: "IN1", to: { pi: 11 }, wire: "green" },
+          { from: "IN2", to: { pi: 13 }, wire: "green" },
+          { from: "IN3", to: { pi: 15 }, wire: "green" },
+          { from: "IN4", to: { pi: 16 }, wire: "green" },
+          { from: "+ (5–12 V)", to: { rail: "5v" }, wire: "red" },
+          { from: "−", to: { rail: "gnd" }, wire: "black" },
+          { from: "motor plug", to: { open: "white socket on the board, fits one way" } } ] }
+      ],
+      before: [
+        "IN1–IN4 in this exact order. A wrong order makes the motor buzz without turning.",
+        "The board needs 5 V on +; the motor will not run on 3.3 V.",
+        "The ON/OFF jumper on the board must be on."
+      ],
+      pass: "The 4 LEDs on the board blink in sequence and the motor turns half a turn one way, then back.",
+      fail: [
+        "Shade moves the wrong way: run the test with <code>--reverse</code>.",
+        "Put the shade in its open start position with <code>--jog &lt;steps&gt;</code> before running other programs."
+      ]
+    },
+    {
+      id: "ultrasonic", title: "HC-SR04 ultrasonic sensor", sub: "Detects someone at the entrance of the scale model.",
+      test: "python pi/tests/test_ultrasonic.py",
+      parts: ["HC-SR04", "2 × 1 kΩ", "5 jumper wires"],
+      diagrams: [],
+      extra: "ultrasonic",
+      wireRows: [
+        { from: "VCC", to: { rail: "5v" }, wire: "red" },
+        { from: "GND", to: { rail: "gnd" }, wire: "black" },
+        { from: "Trig", to: { pi: 8 }, wire: "green", note: "direct, 3.3 V trigger works" },
+        { from: "Echo", to: { pi: 10 }, wire: "green", part: "1 kΩ", note: "through the divider" },
+        { from: "pin-10 row", to: { rail: "gnd" }, wire: "black", part: "1 kΩ", note: "lower half of the divider" }
+      ],
+      before: [
+        "The divider must be in place <b>before</b> the first power-on: Echo gives 5 V, the divider brings it down to 2.5 V (as in the course).",
+        "If the board says HC-SR04P or 3.3 V: power it from 3.3 V and skip the divider.",
+        "GPIO14/15 are also the UART pins: <code>sudo raspi-config</code> → Interface Options → Serial Port must be off."
+      ],
+      pass: "A stable distance to the wall of the model; a hand in front lowers it and shows PRESENT.",
+      fail: [
+        "\"no echo at all\": Trig and Echo swapped, no 5 V, or the divider's lower resistor is not on GND.",
+        "Readings jump around: the sensor sees the breadboard or a wire. Aim it clear of the model's edges."
+      ]
+    },
+    {
+      id: "pico", title: "Pico 2 W seat sensor", sub: "Button under the seat, sent over Wi-Fi and MQTT.",
+      test: "python pi/tests/test_mqtt.py",
+      parts: ["Pico 2 W", "Push button", "2 jumper wires", "Micro-USB cable"],
+      diagrams: [
+        { title: "Seat button", rows: [
+          { from: "leg A", to: { text: "Pico pin 20 · GP15" }, wire: "green" },
+          { from: "leg B (diagonal)", to: { text: "Pico pin 18 · GND" }, wire: "black" } ] }
+      ],
+      before: [
+        "Pico pin 1 is next to the USB connector; pin 20 is the last pin on that same side (GP15), pin 18 is a GND two pins higher.",
+        "Power the Pico over USB. It does not need any wire to the Pi.",
+        "<code>settings.toml</code> on the CIRCUITPY drive has your Wi-Fi and the Pi's IP address (shown by <code>check_setup.py</code>)."
+      ],
+      pass: "The Pico's onboard LED goes on (Wi-Fi + MQTT connected). Pressing the button shows <code>desk/chair/occupied 1</code>, releasing it <code>0</code>.",
+      fail: [
+        "LED stays off: open the serial console in VS Code / Mu and read the connection message.",
+        "Connected but nothing arrives: Mosquitto must listen on the network (<code>config/mosquitto/smartdesk.conf</code>)."
+      ]
+    }
+  ];
+
+  /* ---------- helpers ---------- */
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const destText = to => {
+    if (to.pi) { const full = PI[to.pi][0] + (USE[to.pi] ? " · " + USE[to.pi] : ""); return { main: "Pin " + to.pi, sub: full.length <= 26 ? full : PI[to.pi][0] }; }
+    if (to.rail) return { main: RAIL[to.rail].label, sub: RAIL[to.rail].sub };
+    if (to.text) return { main: to.text, sub: "" };
+    return { main: "", sub: "" };
+  };
+  const pinsOf = step => {
+    const rows = (step.diagrams || []).flatMap(d => d.rows).concat(step.wireRows || []);
+    const set = new Set();
+    rows.forEach(r => { if (r.to.pi) set.add(r.to.pi); if (r.to.rail) RAIL[r.to.rail].pins.forEach(p => set.add(p)); });
+    return set;
+  };
+  const bands = part => RES[part] ? '<span class="bands" aria-hidden="true">' + RES[part].map(b => '<i style="background:' + BAND[b] + '"></i>').join("") + "</span>" : "";
+
+  /* ---------- generic wire diagram ---------- */
+  function wireSVG(d) {
+    const rowH = 40, headH = 36, padY = 10, W = 720, compX = 12, compW = 176, pinX = compX + compW, destX = 466, destW = 242;
+    const H = padY * 2 + headH + d.rows.length * rowH;
+    let s = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Wiring of ' + esc(d.title) + '">';
+    s += '<rect class="cbody" x="' + compX + '" y="' + padY + '" width="' + compW + '" height="' + (H - 2 * padY) + '" rx="10"/>';
+    s += '<text class="ctitle" x="' + (compX + 14) + '" y="' + (padY + 23) + '">' + esc(d.title) + "</text>";
+    s += '<text class="chead" x="' + destX + '" y="' + (padY + 23) + '">CONNECT TO</text>';
+    d.rows.forEach((r, i) => {
+      const cy = padY + headH + i * rowH + rowH / 2;
+      s += '<text class="plabel" text-anchor="end" x="' + (pinX - 14) + '" y="' + (cy + 4) + '">' + esc(r.from) + "</text>";
+      s += '<rect class="pad" x="' + (pinX - 6) + '" y="' + (cy - 5) + '" width="12" height="10" rx="2"/>';
+      if (r.to.open) {
+        s += '<path class="openline" d="M' + (pinX + 6) + " " + cy + "H" + (pinX + 44) + '"/>';
+        s += '<text class="opentxt" x="' + (pinX + 52) + '" y="' + (cy + 4) + '">' + esc(r.to.open) + "</text>";
+        return;
+      }
+      const path = "M" + (pinX + 6) + " " + cy + "H" + destX;
+      s += '<path class="casing" d="' + path + '"/><path class="wire w-' + r.wire + '" d="' + path + '"/>';
+      if (r.part) {
+        const mx = (pinX + destX) / 2;
+        s += '<rect class="part" x="' + (mx - 36) + '" y="' + (cy - 10) + '" width="72" height="20" rx="3"/>';
+        s += '<text class="ptxt" text-anchor="middle" x="' + mx + '" y="' + (cy + 4) + '">' + esc(r.part) + "</text>";
+      } else if (r.note) {
+        s += '<text class="symsmall" text-anchor="middle" x="' + ((pinX + destX) / 2) + '" y="' + (cy - 8) + '">' + esc(r.note) + "</text>";
+      }
+      const t = destText(r.to);
+      s += '<rect class="dest" x="' + destX + '" y="' + (cy - 15) + '" width="' + destW + '" height="30" rx="6"/>';
+      s += '<circle class="node" cx="' + destX + '" cy="' + cy + '" r="3.2"/>';
+      s += '<text x="' + (destX + 12) + '" y="' + (cy + 4.5) + '"><tspan class="dmain">' + esc(t.main) + "</tspan>" + (t.sub ? '<tspan class="dsub" dx="8">' + esc(t.sub.length > 26 ? t.sub.slice(0, 25) + "…" : t.sub) + "</tspan>" : "") + "</text>";
+    });
+    return s + "</svg>";
+  }
+
+  /* ---------- hand-drawn schematics ---------- */
+  const resH = (x, y, label) => '<rect class="part" x="' + x + '" y="' + (y - 9) + '" width="54" height="18" rx="2"/><text class="ptxt" text-anchor="middle" x="' + (x + 27) + '" y="' + (y + 4) + '">' + label + "</text>";
+  const resV = (x, y, label, side) => '<rect class="part" x="' + (x - 9) + '" y="' + y + '" width="18" height="50" rx="2"/><text class="symtxt" x="' + (x + (side < 0 ? -16 : 16)) + '" y="' + (y + 29) + '"' + (side < 0 ? ' text-anchor="end"' : "") + ">" + label + "</text>";
+  const gnd = (x, y) => '<path class="sym" d="M' + x + " " + y + "v8M" + (x - 11) + " " + (y + 8) + "h22M" + (x - 7) + " " + (y + 13) + "h14M" + (x - 3) + " " + (y + 18) + 'h6"/>';
+  const wire = (d, c) => '<path class="casing" d="' + d + '"/><path class="wire w-' + c + '" d="' + d + '"/>';
+  const label = (x, y, main, sub, anchor) => '<text x="' + x + '" y="' + y + '"' + (anchor ? ' text-anchor="' + anchor + '"' : "") + '><tspan class="dmain">' + main + "</tspan>" + (sub ? '<tspan class="dsub" dx="6">' + sub + "</tspan>" : "") + "</text>";
+
+  function ultrasonicSVG() {
+    let s = '<svg viewBox="0 0 720 250" role="img" aria-label="HC-SR04 with a 1 kΩ / 1 kΩ voltage divider on ECHO">';
+    s += '<rect class="cbody" x="12" y="14" width="150" height="196" rx="10"/><text class="ctitle" x="26" y="38">HC-SR04</text>';
+    const pins = [["VCC", 70], ["Trig", 110], ["Echo", 150], ["GND", 190]];
+    pins.forEach(p => { s += '<text class="plabel" text-anchor="end" x="148" y="' + (p[1] + 4) + '">' + p[0] + '</text><rect class="pad" x="156" y="' + (p[1] - 5) + '" width="12" height="10" rx="2"/>'; });
+    s += wire("M168 70H520", "red") + label(530, 75, "5 V rail", "");
+    s += wire("M168 110H520", "green") + label(530, 115, "Pin 8", "GPIO14 · TRIG");
+    s += wire("M168 150H250", "green") + resH(250, 150, "1 kΩ") + wire("M304 150H520", "green") + label(530, 155, "Pin 10", "GPIO15 · ECHO");
+    s += '<circle class="node" cx="400" cy="150" r="4"/>';
+    s += wire("M400 150V170", "black") + resV(400, 170, "1 kΩ", 1) + wire("M400 220V228", "black") + gnd(400, 228);
+    s += '<text class="symsmall" x="414" y="140">2.5 V when Echo is high</text>';
+    s += wire("M168 190H200V228", "black") + gnd(200, 228) + '<text class="symsmall" x="214" y="244">GND rail</text><text class="symsmall" x="414" y="244">GND rail</text>';
+    return s + "</svg>";
+  }
+
+  function analogSVG() {
+    let s = '<svg viewBox="0 0 720 250" role="img" aria-label="Potentiometer on CH0 and LDR divider on CH1">';
+    s += '<text class="ctitle" x="20" y="24">Potentiometer → CH0</text><text class="ctitle" x="380" y="24">LDR divider → CH1</text>';
+    // pot
+    s += label(100, 52, "3.3 V rail", "", "middle") + wire("M100 60V80", "orange");
+    s += '<rect class="part" x="91" y="80" width="18" height="90" rx="2"/>';
+    s += '<path class="sym" d="M140 125H114"/><path class="symfill" d="M112 125l9 -5v10z"/>';
+    s += wire("M140 125H250", "green") + label(150, 114, "middle leg", "") + '<text x="258" y="130"><tspan class="dmain">MCP pin 1</tspan><tspan class="dsub" dx="6">CH0</tspan></text>';
+    s += wire("M100 170V196", "black") + gnd(100, 196) + '<text class="symsmall" x="70" y="140" text-anchor="end">10 kΩ pot</text>';
+    // ldr
+    s += label(460, 52, "3.3 V rail", "", "middle") + wire("M460 60V74", "orange");
+    s += '<rect class="part" x="451" y="74" width="18" height="50" rx="2"/>';
+    s += '<path class="sym" d="M420 84l20 10M420 98l20 10"/><path class="symfill" d="M442 95l-8 -1 4 -6zM442 109l-8 -1 4 -6z"/>';
+    s += '<text class="symsmall" x="412" y="104" text-anchor="end">LDR</text>';
+    s += wire("M460 124V146", "green") + '<circle class="node" cx="460" cy="146" r="4"/>';
+    s += wire("M460 146H690", "green") + '<text x="690" y="138" text-anchor="end"><tspan class="dmain">MCP pin 2</tspan><tspan class="dsub" dx="6">CH1</tspan></text>';
+    s += wire("M460 146V160", "black") + resV(460, 160, "10 kΩ", 1) + wire("M460 210V214", "black") + gnd(460, 214);
+    s += '<text class="symsmall" x="690" y="166" text-anchor="end">more light → higher value</text>';
+    return s + "</svg>";
+  }
+
+  function lampSVG() {
+    let s = '<svg viewBox="0 0 720 210" role="img" aria-label="Two LEDs, each with its own 220 Ω resistor, on pin 32">';
+    s += '<rect class="dest" x="12" y="88" width="150" height="34" rx="6"/>' + label(24, 110, "Pin 32", "GPIO12 PWM");
+    s += wire("M162 105H200", "green") + '<circle class="node" cx="200" cy="105" r="4"/>';
+    [55, 155].forEach((y, i) => {
+      s += wire("M200 105V" + y + "H250", "green") + resH(250, y, "220 Ω") + wire("M304 " + y + "H360", "green");
+      s += '<path class="symfill" d="M360 ' + (y - 12) + "l24 12 -24 12z" + '"/><path class="sym" d="M386 ' + (y - 12) + "v24" + '"/>';
+      s += '<path class="sym" d="M376 ' + (y - 16) + "l8 -8M384 " + (y - 16) + 'l8 -8"/>';
+      s += '<text class="symsmall" x="372" y="' + (y + 28) + '" text-anchor="middle">LED ' + (i + 1) + "</text>";
+      s += '<text class="symsmall" x="352" y="' + (y - 16) + '" text-anchor="end">long leg +</text>';
+      s += '<text class="symsmall" x="398" y="' + (y - 16) + '">short leg −</text>';
+      s += wire("M386 " + y + "H520", "black");
+    });
+    s += wire("M520 55V178", "black") + wire("M520 155V178", "black") + gnd(520, 178) + '<text class="symsmall" x="538" y="200">GND rail</text>';
+    return s + "</svg>";
+  }
+
+  function chipSVG() {
+    const L = ["CH0", "CH1", "CH2", "CH3", "CH4", "CH5", "CH6", "CH7"];
+    const R = ["VDD", "VREF", "AGND", "CLK", "DOUT", "DIN", "CS", "DGND"];
+    const RT = ["→ 3.3 V", "→ 3.3 V", "→ GND", "→ pin 23", "→ pin 21", "→ pin 19", "→ pin 18", "→ GND"];
+    const LT = ["← pot", "← LDR", "", "", "", "", "", ""];
+    let s = '<svg viewBox="0 0 720 330" role="img" aria-label="MCP3008 pinout, notch at the top">';
+    s += '<rect class="cbody" x="290" y="20" width="140" height="290" rx="6"/><path class="sym" d="M342 20a18 18 0 0 0 36 0"/>';
+    s += '<text class="ctitle" x="360" y="175" text-anchor="middle">MCP3008</text><text class="symsmall" x="360" y="56" text-anchor="middle">notch</text>';
+    for (let i = 0; i < 8; i++) {
+      const y = 46 + i * 34;
+      s += '<rect class="pad" x="274" y="' + (y - 5) + '" width="16" height="10" rx="2"/><rect class="pad" x="430" y="' + (y - 5) + '" width="16" height="10" rx="2"/>';
+      s += '<text class="plabel" x="300" y="' + (y + 4) + '">' + (i + 1) + "</text>";
+      s += '<text class="plabel" x="420" y="' + (y + 4) + '" text-anchor="end">' + (16 - i) + "</text>";
+      s += '<text x="264" y="' + (y + 4) + '" text-anchor="end"><tspan class="dmain">' + L[i] + '</tspan><tspan class="dsub" dx="6">' + LT[i] + "</tspan></text>";
+      s += '<text x="456" y="' + (y + 4) + '"><tspan class="dmain">' + R[i] + '</tspan><tspan class="dsub" dx="6">' + RT[i] + "</tspan></text>";
+    }
+    return s + "</svg>";
+  }
+
+  /* ---------- header map ---------- */
+  function buildMap() {
+    const svg = document.getElementById("map");
+    const W = 500, rowH = 25, top = 50, oddX = 236, evenX = 264;
+    const H = top + 20 * rowH + 30;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    let s = '<text class="cap" x="' + ((oddX + evenX) / 2) + '" y="18" text-anchor="middle">PIN 1 END · AWAY FROM USB</text>';
+    s += '<text class="cap" x="' + (oddX - 18) + '" y="38" text-anchor="end">ODD · BOARD SIDE</text><text class="cap" x="' + (evenX + 18) + '" y="38">EVEN · BOARD EDGE</text>';
+    s += '<rect class="hdr" x="' + (oddX - 15) + '" y="' + (top - 14) + '" width="' + (evenX - oddX + 30) + '" height="' + (20 * rowH + 3) + '" rx="6"/>';
+    for (let r = 0; r < 20; r++) {
+      [2 * r + 1, 2 * r + 2].forEach((p, k) => {
+        const x = k ? evenX : oddX, y = top + r * rowH;
+        const kind = PI[p][1];
+        let cls = "pin-free";
+        if (kind === "3v3") cls = "pin-3v3"; else if (kind === "5v") cls = "pin-5v"; else if (kind === "gnd") cls = "pin-gnd";
+        else if (USE[p]) cls = "pin-used"; else if (RESERVED[p]) cls = "pin-res";
+        const lx = k ? evenX + 18 : oddX - 18, anchor = k ? "start" : "end";
+        let lab;
+        if (USE[p]) lab = '<tspan>' + esc(USE[p]) + '</tspan><tspan class="g" dx="5">' + (kind === "io" ? PI[p][0] : "") + "</tspan>";
+        else if (RESERVED[p]) lab = esc(PI[p][0] + " · " + RESERVED[p]);
+        else lab = esc(PI[p][0]);
+        if (!k && USE[p]) lab = (kind === "io" ? '<tspan class="g">' + PI[p][0] + '</tspan><tspan dx="5">' : "<tspan>") + esc(USE[p]) + "</tspan>";
+        const lightNum = cls === "pin-free" || cls === "pin-res";
+        s += '<g class="mp" data-pin="' + p + '"><title>Pin ' + p + " · " + PI[p][0] + (USE[p] ? " · " + USE[p] : RESERVED[p] ? " · " + RESERVED[p] : "") + "</title>";
+        s += '<circle class="ring" cx="' + x + '" cy="' + y + '" r="12.5"/>';
+        s += (p === 1 ? '<rect class="pinc ' + cls + '" x="' + (x - 9) + '" y="' + (y - 9) + '" width="18" height="18" rx="2"/>' : '<circle class="pinc ' + cls + '" cx="' + x + '" cy="' + y + '" r="9"/>');
+        s += '<text class="pnum' + (lightNum ? " on-light" : "") + '" x="' + x + '" y="' + (y + 3) + '">' + p + "</text>";
+        s += '<text class="mlabel' + (USE[p] || kind !== "io" ? "" : RESERVED[p] ? " res" : " res") + '" x="' + lx + '" y="' + (y + 4) + '" text-anchor="' + anchor + '">' + lab + "</text></g>";
+      });
+    }
+    s += '<text class="cap" x="' + ((oddX + evenX) / 2) + '" y="' + (H - 8) + '" text-anchor="middle">USB / ETHERNET END</text>';
+    svg.innerHTML = s;
+  }
+
+  function highlight(pins) {
+    const svg = document.getElementById("map");
+    if (!pins) { svg.classList.remove("sel"); svg.querySelectorAll("g.mp").forEach(g => g.classList.remove("hi")); return; }
+    svg.classList.add("sel");
+    svg.querySelectorAll("g.mp").forEach(g => g.classList.toggle("hi", pins.has(+g.dataset.pin)));
+  }
+
+  /* ---------- progress (per-viewer, browser storage) ---------- */
+  const KEY = "smartdesk-wiring-v1";
+  let progress = {};
+  try { progress = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { progress = {}; }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(progress)); } catch (e) { /* storage unavailable */ } };
+  const stateOf = id => (progress[id] && progress[id].passed) ? "passed" : (progress[id] && progress[id].wired) ? "wired" : "";
+
+  function renderProgress() {
+    const nav = document.getElementById("progress");
+    nav.innerHTML = '<a href="#start"><span class="n">0</span><span>Before you start</span><span></span></a>' + STEPS.map((st, i) => {
+      const s = stateOf(st.id);
+      return '<a href="#' + st.id + '" data-id="' + st.id + '"><span class="n">' + (i + 1) + "</span><span>" + esc(st.title.split(":")[0].split("(")[0].trim()) + '</span><span class="state ' + s + '">' + (s === "passed" ? "test passed" : s === "wired" ? "wired" : "to do") + "</span></a>";
+    }).join("");
+  }
+
+  /* ---------- table rows ---------- */
+  function tableRows(rows) {
+    return rows.map(r => {
+      let to;
+      if (r.to.open) to = '<span class="muted"><i>' + esc(r.to.open) + "</i></span>";
+      else if (r.to.pi) to = '<span class="pin">Pin ' + r.to.pi + "</span> · " + PI[r.to.pi][0];
+      else if (r.to.rail) to = "<b>" + RAIL[r.to.rail].label + "</b>";
+      else to = esc(r.to.text);
+      const via = r.part ? '<span class="sw">' + bands(r.part) + esc(r.part) + "</span>" : r.note ? '<span class="muted">' + esc(r.note) + "</span>" : "";
+      const w = r.wire ? '<span class="sw"><i style="background:var(--w-' + r.wire + ')"></i>' + r.wire + "</span>" : "";
+      return "<tr><td>" + esc(r.from) + "</td><td>" + to + "</td><td>" + via + "</td><td>" + w + "</td></tr>";
+    }).join("");
+  }
+
+  /* ---------- steps ---------- */
+  function renderSteps() {
+    const host = document.getElementById("steps");
+    host.innerHTML = STEPS.map((st, i) => {
+      const allRows = (st.diagrams || []).flatMap(d => d.rows).concat(st.wireRows || []);
+      let h = '<section class="card" id="' + st.id + '" data-id="' + st.id + '">';
+      h += '<div class="card-head"><span class="num">' + (i + 1) + "</span><h2>" + esc(st.title) + '</h2><p class="sub">' + esc(st.sub) + "</p></div>";
+      h += '<div class="run"><span class="cmd">' + esc(st.test) + '</span><button type="button" data-copy="' + esc(st.test) + '">Copy</button>';
+      if (st.test2) h += '<span class="cmd">' + esc(st.test2) + '</span><button type="button" data-copy="' + esc(st.test2) + '">Copy</button>';
+      h += '<button type="button" data-show="' + st.id + '">Show pins on header</button></div>';
+      h += '<div class="parts">' + st.parts.map(p => {
+        const m = p.match(/(220 Ω|1 kΩ|10 kΩ)/);
+        return '<span class="chip">' + (m ? bands(m[1]) : "") + esc(p) + "</span>";
+      }).join("") + "</div>";
+      if (st.checkFirst) h += '<div class="box warn"><h3>First: common cathode or common anode? (10 seconds)</h3><ol>' + st.checkFirst.map(x => "<li>" + x + "</li>").join("") + "</ol></div>";
+      if (st.chip) h += '<div class="diagram"><div class="scroll">' + chipSVG() + "</div></div>";
+      (st.diagrams || []).forEach(d => { h += '<div class="diagram"><div class="scroll">' + wireSVG(d) + "</div></div>"; });
+      if (st.extra === "analog") h += '<div class="diagram"><div class="scroll">' + analogSVG() + "</div></div>";
+      if (st.extra === "lamp") h += '<div class="diagram"><div class="scroll">' + lampSVG() + "</div></div>";
+      if (st.extra === "ultrasonic") h += '<div class="diagram"><div class="scroll">' + ultrasonicSVG() + "</div></div>";
+      h += '<div class="scroll"><table class="wires"><thead><tr><th>Part pin</th><th>Connect to</th><th>Via / note</th><th>Wire</th></tr></thead><tbody>' + tableRows(allRows) + "</tbody></table></div>";
+      h += '<div class="cols"><div class="box"><h3>Check before power-on</h3><ul>' + st.before.map(x => "<li>" + x + "</li>").join("") + '</ul></div>';
+      h += '<div class="box pass"><h3>Passes when</h3><p>' + st.pass + "</p></div>";
+      h += '<div class="box"><h3>If it fails</h3><ul>' + st.fail.map(x => "<li>" + x + "</li>").join("") + "</ul></div></div>";
+      const pr = progress[st.id] || {};
+      h += '<div class="checks"><label><input type="checkbox" id="w-' + st.id + '" data-k="wired" data-id="' + st.id + '"' + (pr.wired ? " checked" : "") + '> Wired and checked</label>';
+      h += '<label><input type="checkbox" id="p-' + st.id + '" data-k="passed" data-id="' + st.id + '"' + (pr.passed ? " checked" : "") + "> Test passed</label></div>";
+      return h + "</section>";
+    }).join("");
+  }
+
+  function renderColourKey() {
+    document.getElementById("colourKey").innerHTML = Object.keys(WIRE).map(k => '<li><span class="sw"><i style="background:var(--w-' + k + ')"></i>' + esc(WIRE[k]) + "</span></li>").join("") +
+      '<li class="muted">Resistors: 220 Ω ' + bands("220 Ω") + " · 1 kΩ " + bands("1 kΩ") + " · 10 kΩ " + bands("10 kΩ") + "</li>";
+  }
+
+  /* ---------- wire up ---------- */
+  buildMap(); renderColourKey(); renderSteps(); renderProgress();
+
+  document.addEventListener("click", e => {
+    const c = e.target.closest("[data-copy]");
+    if (c) {
+      const text = c.getAttribute("data-copy");
+      const done = () => { c.textContent = "Copied"; setTimeout(() => (c.textContent = "Copy"), 1400); };
+      const fallback = () => { const cmd = c.previousElementSibling; const r = document.createRange(); r.selectNodeContents(cmd); const s = getSelection(); s.removeAllRanges(); s.addRange(r); c.textContent = "Selected – press Ctrl+C"; };
+      try { navigator.clipboard.writeText(text).then(done, fallback); } catch (err) { fallback(); }
+      return;
+    }
+    const sh = e.target.closest("[data-show]");
+    if (sh) {
+      const st = STEPS.find(x => x.id === sh.getAttribute("data-show"));
+      highlight(pinsOf(st));
+      if (window.matchMedia("(max-width: 1039px)").matches) document.getElementById("side").scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (e.target.id === "showAll") highlight(null);
+  });
+
+  document.addEventListener("change", e => {
+    const t = e.target;
+    if (!t.matches || !t.matches("input[data-k]")) return;
+    const id = t.dataset.id;
+    progress[id] = progress[id] || {};
+    progress[id][t.dataset.k] = t.checked;
+    save(); renderProgress(); markCurrent(currentId);
+  });
+
+  /* highlight the pins of the step being read (wide screens) */
+  let currentId = null;
+  function markCurrent(id) {
+    document.querySelectorAll("#progress a").forEach(a => a.classList.toggle("current", a.dataset.id === id));
+  }
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(en => {
+        if (!en.isIntersecting) return;
+        const id = en.target.dataset.id;
+        if (!id || id === currentId) return;
+        currentId = id; markCurrent(id);
+        if (window.matchMedia("(min-width: 1040px)").matches) highlight(pinsOf(STEPS.find(x => x.id === id)));
+      });
+    }, { rootMargin: "-35% 0px -55% 0px" });
+    document.querySelectorAll("section.card[data-id]").forEach(s => io.observe(s));
+  }
+})();
+</script>
+
+</body></html>
