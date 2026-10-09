@@ -4,7 +4,7 @@
 #
 # Follows the installation steps from the IoT Essentials course:
 #   - system packages (Python, lgpio, PIL, MariaDB, Mosquitto, I2C tools)
-#   - enables I2C, SPI and hardware PWM on GPIO12
+#   - enables I2C, SPI0, SPI1 (OLED) and hardware PWM on GPIO12
 #   - creates the virtual environment .venv (with --system-site-packages)
 #   - installs the Python packages from requirements*.txt
 #   - installs the Mosquitto config so the Pico can connect
@@ -31,8 +31,14 @@ echo "==> Enabling I2C and SPI"
 sudo raspi-config nonint do_i2c 0
 sudo raspi-config nonint do_spi 0
 
-echo "==> Enabling hardware PWM on GPIO12"
 CONFIG_TXT=/boot/firmware/config.txt
+
+echo "==> Enabling SPI1 for the OLED (GPIO 21/20, module without CS pin)"
+if ! grep -q "^dtoverlay=spi1-1cs" "$CONFIG_TXT"; then
+    echo "dtoverlay=spi1-1cs" | sudo tee -a "$CONFIG_TXT" > /dev/null
+fi
+
+echo "==> Enabling hardware PWM on GPIO12"
 if ! grep -q "^dtoverlay=pwm,pin=12,func=4" "$CONFIG_TXT"; then
     echo "dtoverlay=pwm,pin=12,func=4" | sudo tee -a "$CONFIG_TXT" > /dev/null
 fi
