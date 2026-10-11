@@ -7,12 +7,18 @@ the same topics and payloads as the real programs (see README, "MQTT topics"):
 
     desk/env, desk/actuators, desk/presence, desk/seated, desk/posture,
     desk/chair/occupied – every 3 s
-    desk/alert          – once at startup with --alert (tests ntfy)
+    desk/alert          – with --alert, by the same rules as the real desk
+                          (demo timers from config.Limits):
+                            * movement reminder after SEATED_LIMIT_S of sitting
+                              (once per sitting period)
+                            * posture warning when the posture stays bad for
+                              BAD_POSTURE_AFTER_S, at most once per ALERT_COOLDOWN_S
 
 The values drift slowly (light, temperature, window light), someone sits down
 and gets up every ~2 minutes, and the posture switches between good and bad.
 
 Run from the repository root:   python pi/tests/simulate_desk.py [--alert]
+(With DEMO_MODE=0 in .env the real timers apply: 50 min seated, 5 min cooldown.)
 Do NOT run it at the same time as desk_controller.py. Stop with Ctrl+C.
 """
 
@@ -35,6 +41,12 @@ L = config.Limits
 STEP_S = 3
 
 
+def publish_alert(client, text):
+    """Publish one alert on desk/alert (cloud_bridge.py forwards it to ntfy)."""
+    client.publish(T.ALERT, text)
+    print(f"  >>> ALERT: {text}")
+
+
 def main():
     """Publish a new set of simulated values every STEP_S seconds until Ctrl+C."""
     client = mqtt.Client(CallbackAPIVersion.VERSION2, client_id="smartdesk-simulator")
@@ -46,15 +58,19 @@ def main():
     client.loop_start()
     print(f"Simulating the desk on {config.MQTT_HOST}:{config.MQTT_PORT} (Ctrl+C to stop)")
 
-    if "--alert" in sys.argv:
-        client.publish(T.ALERT, "Test from simulate_desk.py: time to move – 10 squats or a short walk")
-        print("  sent a test alert on desk/alert")
+    send_alerts = "--alert" in sys.argv
+    if send_alerts:
+        print(f"  alerts ON: movement after {L.SEATED_LIMIT_S} s seated, posture after "
+              f"{L.BAD_POSTURE_AFTER_S} s bad (cooldown {L.ALERT_COOLDOWN_S} s)")
 
     start = time.monotonic()
     lux = 320.0
     seated_since = None
     shade_closed = False
     fan_on = False
+    move_alert_sent = False        # movement reminder already sent this sitting period
+    bad_since = None               # when the posture became bad
+    last_posture_alert = -1e9      # time of the last posture warning
     try:
         while True:
             t = time.monotonic() - start
@@ -86,6 +102,18 @@ def main():
 
             posture = ("good" if (t // 30) % 2 == 0 else "bad") if seated else "none"
             angle = None if posture == "none" else (12.0 if posture == "good" else 31.0) + random.uniform(-3, 3)
+
+            # Alerts, by the same rules as desk_controller.py
+            if not seated:
+                move_alert_sent = False
+            bad_since = (bad_since if bad_since is not None else t) if posture == "bad" else None
+            if send_alerts and seated_since is not None and not move_alert_sent and t - seated_since >= L.SEATED_LIMIT_S:
+                move_alert_sent = True
+                publish_alert(client, f"Seated for {seated_min:.0f} min: time to move – 10 squats or a short walk")
+            if (send_alerts and bad_since is not None and t - bad_since >= L.BAD_POSTURE_AFTER_S
+                    and t - last_posture_alert >= L.ALERT_COOLDOWN_S):
+                last_posture_alert = t
+                publish_alert(client, "Bad posture: sit up straight, shoulders back")
 
             client.publish(T.CHAIR, "1" if seated else "0", retain=True)
             client.publish(T.PRESENCE, "1")
