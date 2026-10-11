@@ -129,6 +129,7 @@ class Topics:
     POSTURE = "desk/posture"        # JSON {"state", "angle"}
     ENV = "desk/env"                # JSON {"lux", "temp", "window", "threshold"}
     ACTUATORS = "desk/actuators"    # JSON {"lamp", "fan", "shade"}
+    SEATED = "desk/seated"          # seated time in minutes, e.g. "12.5"
     ALERT = "desk/alert"            # text, forwarded to ntfy
     ALL = "desk/#"
 
@@ -142,7 +143,7 @@ THINGSPEAK_CHANNEL_ID = os.getenv("THINGSPEAK_CHANNEL_ID", "")
 THINGSPEAK_CLIENT_ID = os.getenv("THINGSPEAK_CLIENT_ID", "")
 THINGSPEAK_USERNAME = os.getenv("THINGSPEAK_USERNAME", "")
 THINGSPEAK_PASSWORD = os.getenv("THINGSPEAK_PASSWORD", "")
-THINGSPEAK_INTERVAL_S = 15   # free tier: max. one update every 15 s
+THINGSPEAK_INTERVAL_S = 16   # free tier: max. one update per 15 s (1 s margin)
 
 NTFY_URL = "https://ntfy.sh"
 NTFY_TOPIC = os.getenv("NTFY_TOPIC", "")

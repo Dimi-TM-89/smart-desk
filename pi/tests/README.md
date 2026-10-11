@@ -32,6 +32,15 @@ Wire and test one part at a time. Commit when a test passes.
 | 8 | `test_ultrasonic.py` | HC-SR04 | TRIG 14, ECHO 15 | Stable distance, PRESENT when a hand is in front |
 | 9 | `test_mqtt.py` | Mosquitto + Pico | – | `desk/chair/occupied 1/0` when the seat button is pressed |
 
+## Cloud (no hardware needed)
+
+| Script | What it checks | Passes when |
+|---|---|---|
+| `test_thingspeak.py` | ThingSpeak MQTT device + channel (credentials in `.env`) | "connected" and "published", and one new point appears in every chart |
+| `simulate_desk.py` | Publishes fake `desk/*` values every 3 s (`--alert` also sends one test alert) | Run it next to `python pi/cloud_bridge.py`: the ThingSpeak charts fill up |
+
+Never run `simulate_desk.py` together with `desk_controller.py`: both publish the same topics.
+
 Our OLED has no CS pin, so it runs on its own SPI1 bus (GPIO 21/20). Its pins
 are labelled SCL/SDA, but they are SPI: connect them to pins 40/38, **not** to
 the I²C pins 3/5. GPIO18 and GPIO19 belong to SPI1 too and stay free.

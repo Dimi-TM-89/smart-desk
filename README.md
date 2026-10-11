@@ -108,6 +108,7 @@ are the UART pins, so keep the serial port disabled in `raspi-config`.
 | `desk/posture` | posture_ai | JSON `{"state": "good|bad|none", "angle": 12.3}` |
 | `desk/env` | desk_controller | JSON `{"lux", "temp", "window", "threshold"}` |
 | `desk/actuators` | desk_controller | JSON `{"lamp", "fan", "shade"}` |
+| `desk/seated` | desk_controller | seated time in minutes, e.g. `12.5` |
 | `desk/alert` | desk_controller | text |
 
 Watch everything live on the Pi:
