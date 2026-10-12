@@ -10,11 +10,16 @@ Each check prints OK or a hint about what to fix. Nothing is changed on the Pi.
 
 import importlib
 import os
+import re
+import shutil
 import socket
+import subprocess
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+CONFIG_TXT = Path("/boot/firmware/config.txt")
+CMDLINE_TXT = Path("/boot/firmware/cmdline.txt")
 results = []
 
 
@@ -127,9 +132,30 @@ def database():
     return ", ".join(f"{t} {n} rows" for t, n in counts.items())
 
 
+def serial_port_off():
+    """GPIO14/15 are free for the HC-SR04: no UART and no serial console on them."""
+    problems = []
+    for line in CONFIG_TXT.read_text().splitlines():
+        line = line.strip()
+        if line in ("dtparam=uart0", "dtparam=uart0=on", "enable_uart=1"):
+            problems.append(f"'{line}' in config.txt")
+    if re.search(r"console=(serial0|ttyAMA0|ttyS0)\b", CMDLINE_TXT.read_text()):
+        problems.append("serial console in cmdline.txt")
+    if problems:
+        raise RuntimeError(", ".join(problems)
+                           + " – run scripts/setup_pi.sh again (or see README) and reboot")
+
+    # The files are fine; after a fix the pins only change at the next reboot
+    if shutil.which("pinctrl"):
+        out = subprocess.run(["pinctrl", "get", "14,15"], capture_output=True, text=True).stdout
+        if "TXD0" in out or "RXD0" in out:
+            raise RuntimeError("config is fixed, but GPIO14/15 are still TXD0/RXD0 – reboot the Pi")
+    return "GPIO14/15 free for the ultrasonic sensor"
+
+
 def hardware_pwm():
     """The PWM overlay for GPIO12 is active."""
-    cfg = Path("/boot/firmware/config.txt").read_text()
+    cfg = CONFIG_TXT.read_text()
     if "dtoverlay=pwm,pin=12,func=4" not in cfg:
         raise RuntimeError("overlay missing in /boot/firmware/config.txt")
 
@@ -143,6 +169,7 @@ if __name__ == "__main__":
     check("AI packages (optional)", ai_packages)
     check("I2C / SPI0 / SPI1 enabled", interfaces)
     check("Hardware PWM GPIO12", hardware_pwm)
+    check("Serial port off (GPIO14/15)", serial_port_off)
     check("I2C scan", i2c_devices)
     check("Mosquitto broker", mqtt_broker)
     check(".env file", env_file)

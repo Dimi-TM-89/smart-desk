@@ -104,8 +104,18 @@ Hardware PWM uses the single-channel overlay `dtoverlay=pwm,pin=12,func=4`
 
 The OLED module has no CS pin, so it cannot share SPI0 with the MCP3008. It
 runs on SPI1 (`dtoverlay=spi1-1cs`, also set by the setup script). That
-overlay also claims GPIO18 and GPIO19: do not use them. GPIO14/15 (ultrasonic)
-are the UART pins, so keep the serial port disabled in `raspi-config`.
+overlay also claims GPIO18 and GPIO19: do not use them.
+
+GPIO14/15 (ultrasonic) are the UART pins. While the serial port uses them,
+the controller shows `xGpioHandleRequest: Invalid argument` and skips the
+HC-SR04. The setup script switches the serial port off; to do it by hand:
+
+```bash
+pinctrl get 14,15    # TXD0 / RXD0 = still used by the serial port
+sudo sed -i 's/^dtparam=uart0=on/#dtparam=uart0=on/' /boot/firmware/config.txt
+sudo sed -i 's/console=serial0,115200 //' /boot/firmware/cmdline.txt
+sudo reboot
+```
 
 ## MQTT topics
 
@@ -114,7 +124,7 @@ are the UART pins, so keep the serial port disabled in `raspi-config`.
 | `desk/chair/occupied` | Pico | `1` / `0` |
 | `desk/presence` | desk_controller | `1` / `0` |
 | `desk/posture` | posture_ai | JSON `{"state": "good|bad|none", "angle": 12.3}` |
-| `desk/env` | desk_controller | JSON `{"lux", "temp", "window", "threshold"}` |
+| `desk/env` | desk_controller | JSON `{"lux", "temp", "window", "threshold", "distance"}` (every second) |
 | `desk/actuators` | desk_controller | JSON `{"lamp", "fan", "shade"}` |
 | `desk/seated` | desk_controller | seated time in minutes, e.g. `12.5` |
 | `desk/alert` | desk_controller | text |

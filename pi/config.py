@@ -60,7 +60,8 @@ class Pins:
     STEPPER = (17, 27, 22, 23)   # IN1, IN2, IN3, IN4
 
     # Ultrasonic sensor HC-SR04 (voltage divider on ECHO!)
-    # GPIO14/15 are the UART pins: keep "Serial port" disabled in raspi-config.
+    # GPIO14/15 are the UART pins: the serial port must be off (setup_pi.sh,
+    # check_setup.py checks it), otherwise the HC-SR04 cannot claim them.
     US_TRIG = 14
     US_ECHO = 15
 
@@ -108,6 +109,9 @@ class Limits:
     # Seated time before a movement reminder
     SEATED_LIMIT_S = 60 if DEMO_MODE else 50 * 60
 
+    # desk_controller.py: how often the sensors are read and desk/env is published
+    SENSOR_INTERVAL_S = 1.0
+
     # Posture
     BAD_POSTURE_ANGLE = 25   # degrees forward lean of the neck
     BAD_POSTURE_AFTER_S = 10
@@ -127,7 +131,7 @@ class Topics:
     CHAIR = "desk/chair/occupied"   # Pico → "1" / "0"
     PRESENCE = "desk/presence"      # "1" / "0"
     POSTURE = "desk/posture"        # JSON {"state", "angle"}
-    ENV = "desk/env"                # JSON {"lux", "temp", "window", "threshold"}
+    ENV = "desk/env"                # JSON {"lux", "temp", "window", "threshold", "distance"}
     ACTUATORS = "desk/actuators"    # JSON {"lamp", "fan", "shade"}
     SEATED = "desk/seated"          # seated time in minutes, e.g. "12.5"
     ALERT = "desk/alert"            # text, forwarded to ntfy

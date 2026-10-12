@@ -5,6 +5,7 @@
 # Follows the installation steps from the IoT Essentials course:
 #   - system packages (Python, lgpio, PIL, MariaDB, Mosquitto, I2C tools)
 #   - enables I2C, SPI0, SPI1 (OLED) and hardware PWM on GPIO12
+#   - switches the serial port off, so GPIO14/15 are free for the HC-SR04
 #   - creates the virtual environment .venv (with --system-site-packages)
 #   - installs the Python packages from requirements*.txt
 #   - installs the Mosquitto config so the Pico can connect
@@ -42,6 +43,19 @@ echo "==> Enabling hardware PWM on GPIO12"
 if ! grep -q "^dtoverlay=pwm,pin=12,func=4" "$CONFIG_TXT"; then
     echo "dtoverlay=pwm,pin=12,func=4" | sudo tee -a "$CONFIG_TXT" > /dev/null
 fi
+
+echo "==> Freeing GPIO14/15 for the ultrasonic sensor (serial port off)"
+# GPIO14/15 are the UART pins (TXD0/RXD0). While the UART or a serial login
+# console uses them, the HC-SR04 cannot claim them ("xGpioHandleRequest:
+# Invalid argument"). We work over SSH, so the serial port is not needed.
+CMDLINE_TXT=/boot/firmware/cmdline.txt
+[[ -f "$CONFIG_TXT.bak" ]] || sudo cp "$CONFIG_TXT" "$CONFIG_TXT.bak"
+[[ -f "$CMDLINE_TXT.bak" ]] || sudo cp "$CMDLINE_TXT" "$CMDLINE_TXT.bak"
+sudo raspi-config nonint do_serial_cons 1 || true   # no login console on the serial port
+sudo raspi-config nonint do_serial_hw 1 || true     # serial hardware off
+# Make sure, whatever raspi-config did on this OS version:
+sudo sed -i -E 's/^(dtparam=uart0=on|enable_uart=1)$/#\1/' "$CONFIG_TXT"
+sudo sed -i -E 's/console=(serial0|ttyAMA0|ttyS0),[0-9]+ ?//' "$CMDLINE_TXT"
 
 echo "==> Creating virtual environment .venv"
 cd "$REPO"
