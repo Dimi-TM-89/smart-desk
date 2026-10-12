@@ -28,3 +28,6 @@ Thumbs.db
 
 # Office lock files
 ~$*
+
+# Chart made by pi/db_report.py --plot
+db_report.png

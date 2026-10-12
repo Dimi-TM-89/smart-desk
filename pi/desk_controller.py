@@ -7,7 +7,8 @@ Responsibilities:
     - apply the rules (see section 5.3 of the report)
     - drive the actuators (PWM lamp, RGB LED, fan relay, stepper sunshade)
     - show the status on the OLED
-    - publish desk/* topics and log to MariaDB
+    - publish desk/* topics (db_logger.py stores them in MariaDB,
+      cloud_bridge.py sends them to ThingSpeak)
 
 Status: skeleton – implemented step by step (see README, "Way of working").
 """

@@ -15,9 +15,12 @@ ThingSpeak dashboard.
 smart-desk/
 ├── pi/                     # Everything that runs on the Raspberry Pi 5
 │   ├── config.py           # THE contract: pins, thresholds, MQTT topics, settings
-│   ├── desk_controller.py  # Main program: sensors → rules → actuators, OLED, DB
+│   ├── desk_controller.py  # Main program: sensors → rules → actuators, OLED
 │   ├── posture_ai.py       # Webcam + YOLO pose → publishes desk/posture
 │   ├── cloud_bridge.py     # desk/# → ThingSpeak (every 15 s) and ntfy alerts
+│   ├── db_logger.py        # desk/# → MariaDB (snapshot every 10 s, posture changes, alerts)
+│   ├── database.py         # Small MariaDB wrapper used by the logger and the report
+│   ├── db_report.py        # Work habits per day + chart from the database
 │   ├── check_setup.py      # Verifies the Pi environment (run after setup)
 │   ├── sensors/            # One small class per sensor
 │   ├── actuators/          # One small class per actuator
@@ -26,8 +29,9 @@ smart-desk/
 │   ├── code.py
 │   └── settings.toml.example
 ├── config/mosquitto/       # Broker config (allows the Pico to connect)
-├── db/                     # MariaDB schema
+├── db/                     # MariaDB schema + handy queries
 ├── scripts/setup_pi.sh     # One-time setup of a fresh Pi
+├── scripts/setup_db.sh     # Creates the database, user and tables from .env
 ├── docs/                   # Report, diagrams
 ├── requirements.txt        # Pi Python packages (core)
 ├── requirements-ai.txt     # Pi Python packages (AI, large download)
@@ -53,7 +57,11 @@ smart-desk/
    cp .env.example .env
    nano .env
    ```
-4. Check that everything works:
+4. Create the database (uses `DB_PASSWORD` from `.env`, choose one first):
+   ```bash
+   bash scripts/setup_db.sh
+   ```
+5. Check that everything works:
    ```bash
    source .venv/bin/activate
    python pi/check_setup.py
@@ -115,6 +123,43 @@ Watch everything live on the Pi:
 ```bash
 mosquitto_sub -h localhost -t 'desk/#' -v
 ```
+
+## Running the Smart Desk
+
+Each program runs in its own terminal (later as a systemd service). They only
+talk to each other through the local Mosquitto broker:
+
+```bash
+python pi/desk_controller.py   # sensors, rules, actuators, OLED
+python pi/posture_ai.py        # webcam → desk/posture
+python pi/cloud_bridge.py      # → ThingSpeak + ntfy
+python pi/db_logger.py         # → MariaDB
+```
+
+Without hardware, `python pi/tests/simulate_desk.py --alert` stands in for the
+first two, so the cloud bridge and the database can be tested on their own.
+
+## Database
+
+MariaDB on the Pi (course lesson 8a), database `smartdesk`, written only by
+`db_logger.py`. No camera images are stored, only the posture result.
+
+| Table | One row … | Columns |
+|---|---|---|
+| `readings` | every 10 s (`DB_LOG_INTERVAL_S`) | lux, temperature, window_pct, threshold, presence, seated, seated_min, posture, lamp_pct, fan_on, shade_pct |
+| `posture` | per posture change | state (good/bad/none), angle |
+| `alerts` | per alert sent | kind (movement/posture/other), message |
+
+Because a snapshot is written every 10 s, durations are simply
+*rows × 10 s* (seated time, time with good posture, fan time).
+
+```bash
+python pi/db_report.py             # work habits per day + latest values
+python pi/db_report.py --plot      # also saves db_report.png (last 24 h)
+mariadb -u smartdesk -p smartdesk  # SQL prompt; see db/queries.sql for examples
+```
+
+phpMyAdmin from the course works too: log in as `smartdesk` with `DB_PASSWORD`.
 
 ## Way of working
 

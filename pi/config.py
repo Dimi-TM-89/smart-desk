@@ -156,7 +156,7 @@ DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_USER = os.getenv("DB_USER", "smartdesk")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "smartdesk")
-DB_LOG_INTERVAL_S = 10
+DB_LOG_INTERVAL_S = 10       # db_logger.py: one snapshot per interval (durations = rows x interval)
 
 
 # ---------------------------------------------------------------------------

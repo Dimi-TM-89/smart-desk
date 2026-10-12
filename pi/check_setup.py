@@ -111,6 +111,22 @@ def env_file():
     return "still empty: " + ", ".join(empty) if empty else "complete"
 
 
+def database():
+    """MariaDB runs and the smartdesk database with its tables exists (scripts/setup_db.sh)."""
+    sys.path.insert(0, str(REPO_ROOT / "pi"))
+    from database import Database
+
+    db = Database()
+    try:
+        db.connect()
+        counts = db.table_counts()
+    except Exception as exc:  # noqa: BLE001 – show the connector's message
+        raise RuntimeError(f"{exc} – run: bash scripts/setup_db.sh") from exc
+    finally:
+        db.close()
+    return ", ".join(f"{t} {n} rows" for t, n in counts.items())
+
+
 def hardware_pwm():
     """The PWM overlay for GPIO12 is active."""
     cfg = Path("/boot/firmware/config.txt").read_text()
@@ -130,4 +146,5 @@ if __name__ == "__main__":
     check("I2C scan", i2c_devices)
     check("Mosquitto broker", mqtt_broker)
     check(".env file", env_file)
+    check("MariaDB database", database)
     print(f"\n{sum(results)}/{len(results)} checks passed")

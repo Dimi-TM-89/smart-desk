@@ -32,12 +32,14 @@ Wire and test one part at a time. Commit when a test passes.
 | 8 | `test_ultrasonic.py` | HC-SR04 | TRIG 14, ECHO 15 | Stable distance, PRESENT when a hand is in front |
 | 9 | `test_mqtt.py` | Mosquitto + Pico | – | `desk/chair/occupied 1/0` when the seat button is pressed |
 
-## Cloud (no hardware needed)
+## Cloud and database (no hardware needed)
 
 | Script | What it checks | Passes when |
 |---|---|---|
 | `test_thingspeak.py` | ThingSpeak MQTT device + channel (credentials in `.env`) | "connected" and "published", and one new point appears in every chart |
-| `simulate_desk.py` | Publishes fake `desk/*` values every 3 s (`--alert` also sends one test alert) | Run it next to `python pi/cloud_bridge.py`: the ThingSpeak charts fill up |
+| `simulate_desk.py` | Publishes fake `desk/*` values every 3 s (`--alert` also sends alerts by the real timing rules) | Run it next to `python pi/cloud_bridge.py`: the ThingSpeak charts fill up |
+| `test_db.py` | MariaDB connection, tables, write/read (run `scripts/setup_db.sh` first) | Four OK lines |
+| `simulate_desk.py` + `db_logger.py` | The whole path MQTT → database | A `[db] reading` line every 10 s; `python pi/db_report.py` shows the rows |
 
 Never run `simulate_desk.py` together with `desk_controller.py`: both publish the same topics.
 
