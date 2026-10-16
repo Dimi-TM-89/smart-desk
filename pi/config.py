@@ -48,7 +48,7 @@ class Pins:
     OLED_DC = 6
     OLED_RST = 4
 
-    # PWM desk lamp (hardware PWM through Blinka/lgpio)
+    # PWM desk lamp (hardware PWM0 channel 0 via dtoverlay=pwm,pin=12,func=4)
     LAMP_PWM = 12
 
     # RGB posture LED (common cathode, plain digital outputs)

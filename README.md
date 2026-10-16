@@ -99,9 +99,12 @@ All pin numbers (BCM) live in [`pi/config.py`](pi/config.py). Change them
 
 Pico: seat button on **GP15** (to GND, internal pull-up).
 
-Hardware PWM on GPIO12 is provided by Blinka/lgpio. Do not enable the
-`dtoverlay=pwm,pin=12,func=4` kernel overlay: it claims GPIO12 before
-`pwmio.PWMOut` can use it. GPIO13 stays free for the RGB LED.
+The desk lamp uses **real hardware PWM**: the single-channel overlay
+`dtoverlay=pwm,pin=12,func=4` (set by the setup script) hands GPIO12 to the
+PWM block of the Pi 5, and `pi/actuators/hw_pwm.py` drives it through
+`/sys/class/pwm`. Blinka's `pwmio` is not used for the lamp: on the Pi 5 it
+only offers software-timed PWM (`lgpio.tx_pwm`), and it cannot claim a pin the
+overlay owns. GPIO13 stays a plain output for the RGB LED.
 
 The OLED module has no CS pin, so it cannot share SPI0 with the MCP3008. It
 runs on SPI1 (`dtoverlay=spi1-1cs`, also set by the setup script). That

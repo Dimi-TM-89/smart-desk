@@ -25,7 +25,7 @@ Wire and test one part at a time. Commit when a test passes.
 | 2 | `test_adc.py` | MCP3008, pot, LDR | SPI0, CS 24 | Pot goes 0 → 1023 smoothly, LDR reacts to light |
 | 3 | `test_oled.py` | SSD1306 OLED (no CS) | SPI1: SCL→21, SDA→20, DC 6, RES 4 | Frame fills the screen, counter runs |
 | 3b | `test_oled.py --with-adc` | OLED + MCP3008 together | SPI1 + SPI0 | Pot value follows cleanly on the OLED |
-| 4 | `test_lamp.py` | Desk lamp LEDs | 12 (hardware PWM) | Smooth fade, no flicker |
+| 4 | `test_lamp.py` | Desk lamp LEDs | 12 (hardware PWM) | Smooth fade, no flicker; `pinctrl` shows PWM0_CHAN0 |
 | 5 | `test_rgb.py` | RGB LED | 13 / 5 / 26 | Red → green → blue in that order |
 | 6 | `test_fan.py` | Relay + fan button | 16 / 25 | Relay clicks; button toggles the fan |
 | 7 | `test_stepper.py` | Stepper sunshade | 17 / 27 / 22 / 23 | Half a turn one way and back |

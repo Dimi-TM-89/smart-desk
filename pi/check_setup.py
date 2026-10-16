@@ -154,18 +154,29 @@ def serial_port_off():
 
 
 def hardware_pwm():
-    """GPIO12 is available for Blinka's hardware PWM implementation."""
-    active_lines = (
+    """GPIO12 is routed to the PWM block and the sysfs PWM channel is usable."""
+    active_lines = [
         line.strip()
         for line in CONFIG_TXT.read_text().splitlines()
         if not line.lstrip().startswith("#")
-    )
-    if "dtoverlay=pwm,pin=12,func=4" in active_lines:
-        raise RuntimeError(
-            "remove dtoverlay=pwm,pin=12,func=4 from /boot/firmware/config.txt "
-            "because Blinka claims GPIO12 through lgpio"
-        )
-    return "GPIO12 available for Blinka/lgpio"
+    ]
+    if "dtoverlay=pwm,pin=12,func=4" not in active_lines:
+        raise RuntimeError("overlay missing in /boot/firmware/config.txt – "
+                           "run scripts/setup_pi.sh again and reboot")
+
+    sys.path.insert(0, str(REPO_ROOT / "pi"))
+    from actuators.hw_pwm import find_pwm_chip
+
+    chip = find_pwm_chip()          # raises with a hint when the overlay is not loaded
+    if not os.access(chip / "export", os.W_OK):
+        raise RuntimeError(f"no write access to {chip}/export – add the user to the gpio group")
+
+    # After a fix in config.txt the pin only changes at the next reboot
+    if shutil.which("pinctrl"):
+        out = subprocess.run(["pinctrl", "get", "12"], capture_output=True, text=True).stdout
+        if "PWM" not in out:
+            raise RuntimeError(f"GPIO12 is not in PWM mode ({out.strip()}) – reboot the Pi")
+    return f"{chip.name}, channel 0 on GPIO12"
 
 
 if __name__ == "__main__":

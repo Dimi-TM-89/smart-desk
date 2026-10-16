@@ -4,15 +4,19 @@ test_lamp.py – Test the PWM desk lamp on GPIO12 (hardware PWM).
 What it does: fades the lamp up and down a few times, then lets you type a
 brightness (0–100) to set it yourself.
 
-Expected: smooth fading without flicker.
-If creating the PWM output fails: make sure GPIO12 is not claimed by a
-`dtoverlay=pwm,pin=12,func=4` line in /boot/firmware/config.txt. Blinka
-claims the pin itself through lgpio, so the kernel PWM overlay must not be
-enabled.
+Expected: smooth fading without flicker, and `pinctrl get 12` shows the
+pin in PWM mode (PWM0_CHAN0): proof that the RP1 PWM block drives the LED,
+not software.
+If creating the PWM output fails: check that /boot/firmware/config.txt
+contains  dtoverlay=pwm,pin=12,func=4  and that you rebooted
+(python pi/check_setup.py checks this too). `ls /sys/class/pwm/` should
+show a pwmchip.
 
 Run from the repository root:   python pi/tests/test_lamp.py
 """
 
+import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -30,8 +34,14 @@ def main():
         lamp = Lamp(config.Pins.LAMP_PWM)
     except Exception as exc:  # noqa: BLE001 – show the hint for every failure
         print(f"FAIL: could not start PWM: {exc}")
-        print("  -> remove dtoverlay=pwm,pin=12,func=4 from /boot/firmware/config.txt and reboot.")
+        print("  -> is dtoverlay=pwm,pin=12,func=4 in /boot/firmware/config.txt? Reboot after adding.")
         return
+
+    print(f"  {lamp.pwm}")
+    if shutil.which("pinctrl"):
+        mode = subprocess.run(["pinctrl", "get", str(config.Pins.LAMP_PWM)],
+                              capture_output=True, text=True).stdout.strip()
+        print(f"  pinctrl: {mode}")
 
     try:
         print("Fading 3 times ...")
