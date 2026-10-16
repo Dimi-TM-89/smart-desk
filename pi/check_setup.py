@@ -154,10 +154,18 @@ def serial_port_off():
 
 
 def hardware_pwm():
-    """The PWM overlay for GPIO12 is active."""
-    cfg = CONFIG_TXT.read_text()
-    if "dtoverlay=pwm,pin=12,func=4" not in cfg:
-        raise RuntimeError("overlay missing in /boot/firmware/config.txt")
+    """GPIO12 is available for Blinka's hardware PWM implementation."""
+    active_lines = (
+        line.strip()
+        for line in CONFIG_TXT.read_text().splitlines()
+        if not line.lstrip().startswith("#")
+    )
+    if "dtoverlay=pwm,pin=12,func=4" in active_lines:
+        raise RuntimeError(
+            "remove dtoverlay=pwm,pin=12,func=4 from /boot/firmware/config.txt "
+            "because Blinka claims GPIO12 through lgpio"
+        )
+    return "GPIO12 available for Blinka/lgpio"
 
 
 if __name__ == "__main__":

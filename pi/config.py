@@ -48,7 +48,7 @@ class Pins:
     OLED_DC = 6
     OLED_RST = 4
 
-    # PWM desk lamp (hardware PWM0 via dtoverlay=pwm,pin=12,func=4)
+    # PWM desk lamp (hardware PWM through Blinka/lgpio)
     LAMP_PWM = 12
 
     # RGB posture LED (common cathode, plain digital outputs)
@@ -72,7 +72,7 @@ class Pins:
 
 # I2C addresses
 BH1750_ADDRESS = 0x23
-BMP280_ADDRESS = 0x77        # 0x77 = Adafruit board, 0x76 = most Chinese boards
+BMP280_ADDRESS = 0x76        # 0x77 = Adafruit board, 0x76 = most Chinese boards
 
 # MCP3008 channels
 ADC_THRESHOLD_POT = 0        # potentiometer: light threshold

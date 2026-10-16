@@ -362,12 +362,12 @@ g.mp.hi .ring { opacity: 1; }
       before: [
         "Long leg (+, anode) toward the resistor and pin 32. The short leg sits on the flat side of the rim and goes to GND.",
         "Each LED gets its own 220 Ω resistor. Both resistors start from the same breadboard row that pin 32 feeds.",
-        "Hardware PWM needs <code>dtoverlay=pwm,pin=12,func=4</code> (already set by <code>setup_pi.sh</code>)."
+        "Hardware PWM is provided by Blinka/lgpio. Do not enable <code>dtoverlay=pwm,pin=12,func=4</code>, because it claims GPIO12 before the Python code can use it."
       ],
       pass: "Both LEDs fade up and down smoothly, without flicker, and follow the brightness you type.",
       fail: [
         "One LED stays dark: it is the wrong way round. Turn it.",
-        "\"could not start PWM\": overlay missing or no reboot. <code>ls /sys/class/pwm/</code> should show a pwmchip."
+        "\"could not start PWM\": remove the kernel PWM overlay from <code>/boot/firmware/config.txt</code> and reboot."
       ]
     },
     {

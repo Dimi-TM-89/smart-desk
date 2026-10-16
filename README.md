@@ -99,8 +99,9 @@ All pin numbers (BCM) live in [`pi/config.py`](pi/config.py). Change them
 
 Pico: seat button on **GP15** (to GND, internal pull-up).
 
-Hardware PWM uses the single-channel overlay `dtoverlay=pwm,pin=12,func=4`
-(set by the setup script), so GPIO13 stays free for the RGB LED.
+Hardware PWM on GPIO12 is provided by Blinka/lgpio. Do not enable the
+`dtoverlay=pwm,pin=12,func=4` kernel overlay: it claims GPIO12 before
+`pwmio.PWMOut` can use it. GPIO13 stays free for the RGB LED.
 
 The OLED module has no CS pin, so it cannot share SPI0 with the MCP3008. It
 runs on SPI1 (`dtoverlay=spi1-1cs`, also set by the setup script). That
