@@ -121,8 +121,11 @@ class Limits:
     PRESENCE_DROP_CM = 5
     STANDBY_AFTER_S = 30 if DEMO_MODE else 300
 
-    # Seated time before a movement reminder
+    # Seated time before a movement reminder (repeated every SEATED_LIMIT_S while seated)
     SEATED_LIMIT_S = 60 if DEMO_MODE else 50 * 60
+    # Away from the seat at least this long = a real break: the seated timer restarts.
+    # Shorter (grabbing a coffee, shifting on the chair) and the timer just goes on.
+    BREAK_MIN_S = 10 if DEMO_MODE else 2 * 60
 
     # desk_controller.py: how often the sensors are read and desk/env is published
     SENSOR_INTERVAL_S = 1.0

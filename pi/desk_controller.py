@@ -3,8 +3,8 @@ desk_controller.py – Main program of the Smart Desk (runs on the Raspberry Pi 
 
 Responsibilities (built in layers, see README "Running the Smart Desk"):
     1. read all sensors and publish desk/env                       <- done
-    2. climate rules: PWM lamp, sunshade, fan (+ button override)  <- this layer
-    3. presence (ultrasonic), seat (Pico over MQTT), seated timer, movement alert
+    2. climate rules: PWM lamp, sunshade, fan (+ button override)  <- done
+    3. presence (ultrasonic), seat (Pico over MQTT), seated timer, movement alert  <- this layer
     4. posture input (RGB LED) and the OLED status screen
 db_logger.py stores what this program publishes in MariaDB, cloud_bridge.py
 sends it to ThingSpeak.
@@ -34,11 +34,30 @@ Layer 2 – climate rules (every SENSOR_INTERVAL_S, after the sensor reading):
     again: then the rule is in charge again.
 The states are published on desk/actuators: {"lamp": 40, "fan": true, "shade": 100}
 
-Multithreading: the stepper needs ~3 s for a full movement. It runs in its
-own thread (actuators/shade_mover.py), so the main loop keeps reading the
-buttons and sensors while the shade moves. A button press during a movement
-turns the shade around at once. (paho-mqtt adds its own network thread with
-loop_start().)
+Layer 3 – presence and seat:
+    Presence   Someone is "there" after the HC-SR04 sees them at the entrance,
+               while the seat is occupied, or after a button press. With no
+               such activity for STANDBY_AFTER_S the desk goes to STANDBY:
+               lamp and fan off (the sunshade keeps protecting the room).
+    Seat       The Pico publishes desk/chair/occupied (1/0). The seated timer
+               starts when someone sits down; a short stand-up does not reset
+               it, a real break (BREAK_MIN_S) does.
+    Movement   After SEATED_LIMIT_S in the chair a reminder goes to desk/alert
+               (cloud_bridge.py forwards it to ntfy), and again every
+               SEATED_LIMIT_S while the person keeps sitting.
+Published every SENSOR_INTERVAL_S: desk/presence "1"/"0", desk/seated "12.5" (minutes).
+
+Multithreading – this program runs four threads:
+    main thread    buttons (20x per second), sensors and rules (every second)
+    shade          actuators/shade_mover.py: the stepper needs ~3 s for a full
+                   movement; the main thread only sets a target. A button press
+                   during a movement turns the shade around at once.
+    ultrasonic     sensors/ultrasonic_watcher.py: one distance takes ~0.2 s, so
+                   it is measured non-stop in the background (~5x per second)
+                   and the main thread only reads the newest value.
+    MQTT network   paho-mqtt's loop_start(). Seat messages from the Pico arrive
+                   on that thread; they go through a queue.Queue to the main
+                   thread, which owns all the seat state.
 
 Parts that are not connected (yet) are reported at startup and skipped: the
 program keeps running with the rest. That way every part can be added and
@@ -52,6 +71,7 @@ Stop with Ctrl+C. Do not run tests/simulate_desk.py at the same time.
 """
 
 import json
+import queue
 import time
 
 import paho.mqtt.client as mqtt
@@ -68,6 +88,7 @@ from sensors.button import Button
 from sensors.light import LightSensor
 from sensors.temperature import TemperatureSensor
 from sensors.ultrasonic import Ultrasonic
+from sensors.ultrasonic_watcher import UltrasonicWatcher
 
 T = config.Topics
 L = config.Limits
@@ -171,14 +192,15 @@ class ManualOverride:
 # The controller
 # ---------------------------------------------------------------------------
 class DeskController:
-    """Reads the sensors (layer 1) and runs the climate rules (layer 2)."""
+    """Sensors (layer 1), climate rules (layer 2), presence and seat (layer 3)."""
 
     def __init__(self):
         """Prepare the rules and the MQTT client; the hardware is opened in setup_hardware()."""
         self.light = None           # LightSensor or None when not connected
         self.temp = None            # TemperatureSensor
         self.adc = None             # AnalogInputs (pot + window LDR)
-        self.ultrasonic = None      # Ultrasonic
+        self.ultrasonic = None      # UltrasonicWatcher (the Ultrasonic runs in its own thread)
+        self._sonar = None          # the Ultrasonic itself, released at the end
         self.lamp = None            # Lamp (hardware PWM)
         self.fan = None             # Fan (relay)
         self.fan_button = None      # Button
@@ -193,6 +215,15 @@ class DeskController:
         self.fan_override = ManualOverride()
         self.shade_override = ManualOverride()
 
+        # Layer 3: presence and seat (only used by the main thread)
+        self.inbox = queue.Queue()  # messages from the MQTT thread: (topic, payload)
+        self.present = False        # False = standby
+        self.last_activity = None   # time.monotonic() of the last sign of life
+        self.seated = False         # newest state from the Pico
+        self.seated_since = None    # start of the current sitting session
+        self.left_seat_at = None    # when the person last stood up
+        self.next_move_alert = None # when the next movement reminder is due
+
         self._buses = []            # I2C / SPI buses, released at the end
         self._last_warning = {}     # sensor name -> time of the last warning
 
@@ -200,6 +231,7 @@ class DeskController:
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
         self.client.on_connect_fail = self._on_connect_fail
+        self.client.on_message = self._on_message
 
     # --- startup -----------------------------------------------------------
     @staticmethod
@@ -233,16 +265,19 @@ class DeskController:
                                  lambda: AnalogInputs(spi, P.MCP3008_CS,
                                                       config.ADC_THRESHOLD_POT, config.ADC_WINDOW_LDR))
 
-        self.ultrasonic = self._try(f"HC-SR04 ultrasonic (TRIG {P.US_TRIG}, ECHO {P.US_ECHO})",
-                                    lambda: Ultrasonic(P.US_TRIG, P.US_ECHO))
-        if self.ultrasonic is not None:
+        sonar = self._try(f"HC-SR04 ultrasonic (TRIG {P.US_TRIG}, ECHO {P.US_ECHO})",
+                          lambda: Ultrasonic(P.US_TRIG, P.US_ECHO))
+        if sonar is not None:
             print("        measuring the empty scene (keep the entrance clear) ...")
-            baseline = self.ultrasonic.calibrate()
+            baseline = sonar.calibrate()
             if baseline is None:
                 print("        no echo: check the wiring (VCC on 3.3 V, TRIG/ECHO not swapped)")
             else:
                 print(f"        baseline {baseline:.1f} cm, presence below "
                       f"{baseline - L.PRESENCE_DROP_CM:.1f} cm")
+            self._sonar = sonar
+            self.ultrasonic = UltrasonicWatcher(sonar, L.PRESENCE_DROP_CM)   # starts its thread
+            print("        measures in its own thread")
 
         self.lamp = self._try(f"Desk lamp (hardware PWM GPIO{P.LAMP_PWM})", lambda: Lamp(P.LAMP_PWM))
         if self.lamp is None:
@@ -268,6 +303,13 @@ class DeskController:
             print(f"[mqtt] connection refused: {reason_code}")
         else:
             print(f"[mqtt] connected to {config.MQTT_HOST}:{config.MQTT_PORT}")
+            # (Re)subscribe on every connect; the Pico's retained message
+            # arrives at once, so the seat state is known right away
+            client.subscribe(T.CHAIR)
+
+    def _on_message(self, client, userdata, msg):
+        """Runs on the MQTT thread: only hand the message to the main thread."""
+        self.inbox.put((msg.topic, msg.payload.decode(errors="replace").strip()))
 
     def _on_connect_fail(self, client, userdata):
         """The broker cannot be reached; the desk keeps working and paho keeps retrying."""
@@ -306,7 +348,7 @@ class DeskController:
             "temp": self._read("BMP280", lambda: temp.temperature) if temp else None,
             "window": self._read("window LDR", lambda: adc.window_percent) if adc else None,
             "threshold": threshold_from_pot(pot) if pot is not None else None,
-            "distance": self._read("HC-SR04", us.distance_cm) if us else None,
+            "distance": us.distance if us else None,    # newest value from the ultrasonic thread
         }
 
     def publish_env(self, values):
@@ -340,13 +382,21 @@ class DeskController:
             print(f"[shade] {'closing' if closed else 'opening'} ({why})")
 
     def apply_rules(self, values):
-        """Decide lamp, fan and shade from one sensor reading."""
-        if self.lamp is not None:
-            self.lamp_target = next_lamp_level(self.lamp_target, values["lux"], values["threshold"])
+        """Decide lamp, fan and shade from one sensor reading.
 
-        auto = self.fan_rule.update(values["temp"])
-        want = self.fan_override.output(auto)
-        self._set_fan(want, "manual" if self.fan_override.active else f"temperature {values['temp']} °C")
+        In standby (nobody there) the lamp and the fan stay off; the sunshade
+        keeps working, it protects the room from the sun also when it is empty.
+        """
+        auto = self.fan_rule.update(values["temp"])     # keep following the temperature
+        if not self.present:
+            self.lamp_target = 0.0
+            self.fan_override.active = False
+            self._set_fan(False, "standby")
+        else:
+            if self.lamp is not None:
+                self.lamp_target = next_lamp_level(self.lamp_target, values["lux"], values["threshold"])
+            want = self.fan_override.output(auto)
+            self._set_fan(want, "manual" if self.fan_override.active else f"temperature {values['temp']} °C")
 
         auto = self.shade_rule.update(values["window"])
         want = self.shade_override.output(auto)
@@ -356,10 +406,12 @@ class DeskController:
     def poll_buttons(self):
         """Handle a press on the fan or shade button (called 20x per second)."""
         if self.fan_button is not None and self.fan is not None and self.fan_button.was_pressed():
+            self.activity("fan button")
             on = self.fan_override.press(self.fan_rule.state, self.fan.is_on)
             self._set_fan(on, "button, " + ("manual" if self.fan_override.active else "automatic again"))
 
         if self.shade_button is not None and self.shade is not None and self.shade_button.was_pressed():
+            self.activity("shade button")
             closed = self.shade_override.press(self.shade_rule.state, self.shade_closed)
             self._set_shade(closed, "button, " + ("manual" if self.shade_override.active else "automatic again"))
 
@@ -376,6 +428,95 @@ class DeskController:
         if self.shade is not None and not self.shade.alive:
             print(f"[shade] thread stopped: {self.shade.error} – sunshade disabled")
             self.shade = None
+
+    # --- layer 3: presence, seat, movement reminder -------------------------
+    def activity(self, why):
+        """A sign of life: wake up from standby (or stay awake)."""
+        self.last_activity = time.monotonic()
+        if not self.present:
+            self.present = True
+            print(f"[presence] awake ({why})")
+
+    def handle_messages(self):
+        """Process what the MQTT thread received (runs on the main thread)."""
+        while True:
+            try:
+                topic, payload = self.inbox.get_nowait()
+            except queue.Empty:
+                return
+            if topic == T.CHAIR:
+                if payload in ("1", "0"):
+                    self.seat_changed(payload == "1")
+                else:
+                    print(f"[seat] ignored unknown payload {payload!r}")
+
+    def seat_changed(self, seated):
+        """The Pico reports a new seat state."""
+        if seated == self.seated:
+            return                                  # e.g. the retained message after a reconnect
+        now = time.monotonic()
+        self.seated = seated
+        if seated:
+            self.activity("seat")
+            if self.seated_since is None:           # new session (first time, or after a real break)
+                self.seated_since = now
+                self.next_move_alert = now + L.SEATED_LIMIT_S
+                print("[seat] sat down – timer started")
+            else:
+                print(f"[seat] back after {now - self.left_seat_at:.0f} s – timer goes on")
+            self.left_seat_at = None
+        else:
+            self.left_seat_at = now
+            print("[seat] stood up")
+
+    @property
+    def seated_minutes(self):
+        """Length of the current sitting session in minutes (0 without one)."""
+        if self.seated_since is None:
+            return 0.0
+        return (time.monotonic() - self.seated_since) / 60
+
+    def update_presence_and_seat(self):
+        """Once per reading: seat timer, movement reminder, standby."""
+        now = time.monotonic()
+
+        # A real break ends the sitting session
+        if not self.seated and self.left_seat_at is not None and now - self.left_seat_at >= L.BREAK_MIN_S:
+            if self.seated_since is not None:
+                print(f"[seat] break of {L.BREAK_MIN_S} s – timer reset")
+            self.seated_since = self.next_move_alert = self.left_seat_at = None
+
+        # Movement reminder, repeated every SEATED_LIMIT_S while sitting
+        if self.seated and self.next_move_alert is not None and now >= self.next_move_alert:
+            self.next_move_alert += L.SEATED_LIMIT_S
+            text = f"Seated for {self.seated_minutes:.0f} min: time to move – 10 squats or a short walk"
+            self.publish(T.ALERT, text)
+            print(f"[alert] {text}")
+
+        # Presence: the entrance sensor and the seat count as activity
+        if self.ultrasonic is not None:
+            seen = self.ultrasonic.last_seen
+            if seen is not None and (self.last_activity is None or seen > self.last_activity):
+                self.activity("entrance")
+        if self.seated:
+            self.activity("seat")
+        if self.present and now - self.last_activity >= L.STANDBY_AFTER_S:
+            self.present = False
+            print(f"[presence] nobody for {L.STANDBY_AFTER_S} s – standby")
+
+    def check_ultrasonic_thread(self):
+        """Report once if the ultrasonic thread died on an error; presence then relies on the seat."""
+        if self.ultrasonic is not None and not self.ultrasonic.alive:
+            print(f"[sensor] ultrasonic thread stopped: {self.ultrasonic.error} – entrance detection off")
+            self.ultrasonic = None
+
+    def publish_status(self):
+        """Publish desk/presence and desk/seated; returns what was sent (for the console line)."""
+        presence = "1" if self.present else "0"
+        seated = f"{self.seated_minutes:.1f}"
+        self.publish(T.PRESENCE, presence)
+        self.publish(T.SEATED, seated)
+        return {"present": presence, "seat": "1" if self.seated else "0", "seated_min": seated}
 
     def publish_actuators(self):
         """Publish lamp %, fan on/off and shade % on desk/actuators; returns what was sent."""
@@ -398,22 +539,28 @@ class DeskController:
         self.client.connect_async(config.MQTT_HOST, config.MQTT_PORT, keepalive=60)
         self.client.loop_start()
 
-        print(f"Publishing {T.ENV} and {T.ACTUATORS} every {L.SENSOR_INTERVAL_S} s (Ctrl+C to stop)")
+        print(f"Publishing {T.ENV}, {T.ACTUATORS}, {T.PRESENCE} and {T.SEATED} "
+              f"every {L.SENSOR_INTERVAL_S} s (Ctrl+C to stop)")
+        print("[presence] standby until someone enters, sits down or presses a button")
         next_read = last = time.monotonic()
         try:
             while True:
                 now = time.monotonic()
                 self.poll_buttons()
+                self.handle_messages()
                 if now >= next_read:
                     # never "catch up" with a burst when a read took long
                     next_read = max(next_read + L.SENSOR_INTERVAL_S, now)
+                    self.check_ultrasonic_thread()
+                    self.update_presence_and_seat()
                     values = self.read_sensors()
                     self.apply_rules(values)
                     self.check_shade_thread()
                     env = self.publish_env(values)
                     act = self.publish_actuators()
+                    status = self.publish_status()
                     print("  " + "  ".join(f"{k}={'–' if v is None else v}"
-                                           for k, v in {**env, **act}.items()))
+                                           for k, v in {**env, **act, **status}.items()))
                 self.fade_lamp(now - last)
                 last = now
                 time.sleep(LOOP_S)
@@ -429,8 +576,10 @@ class DeskController:
             self.shade.stop(park=True)           # waits for the shade thread to finish
             if self.shade.alive:
                 print("  the shade thread did not finish in time – jog the shade back to open")
+        if self.ultrasonic is not None:
+            self.ultrasonic.stop()                   # ends the ultrasonic thread
         for part in (self.lamp, self.fan, self._stepper, self.fan_button, self.shade_button,
-                     self.adc, self.ultrasonic):
+                     self.adc, self._sonar):
             if part is not None:
                 try:
                     part.deinit()

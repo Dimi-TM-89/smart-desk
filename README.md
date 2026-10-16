@@ -171,16 +171,45 @@ A button press holds until the automatic rule changes its mind (the sun goes
 away, the room cools down) or until the button is pressed again; then the rule
 is in charge again. All limits are in `config.Limits`.
 
+### Presence and seat (desk_controller.py, layer 3)
+
+| Input | Effect |
+|---|---|
+| HC-SR04 sees someone at the entrance, the seat is occupied, or a button is pressed | Desk is awake: `desk/presence` = 1 |
+| None of these for `STANDBY_AFTER_S` (demo 30 s) | Standby: lamp and fan off (the sunshade keeps working) |
+| Pico: seat occupied | Seated timer starts; published on `desk/seated` in minutes |
+| Seated for `SEATED_LIMIT_S` (demo 1 min) | Movement reminder on `desk/alert` (→ ntfy), repeated every `SEATED_LIMIT_S` |
+| Up for less than `BREAK_MIN_S` (demo 10 s) | Timer goes on (shifting, grabbing a coffee) |
+| Up for at least `BREAK_MIN_S` | Real break: the timer starts again from 0 |
+
+The controller starts in standby; walk in, sit down or press a button to wake it.
+
 ### Multithreading
 
-The stepper needs about 3 s for a full open/close. `actuators/shade_mover.py`
-runs it in a thread of its own (course lesson 5), so the main loop keeps
-reading the sensors and buttons while the shade moves. The main thread only
-sets a target; the shade thread steps towards it in small chunks and checks
-the target again after each chunk, so a button press turns the shade around at
-once. The target is shared between the threads and protected by a
-`threading.Condition` (a lock plus a wake-up signal). At Ctrl+C the shade is
-driven back to open, the start position every program assumes.
+`desk_controller.py` runs four threads (course lesson 5):
+
+| Thread | Job |
+|---|---|
+| main | Buttons (20× per second), sensors and rules (every second), publishing |
+| shade (`actuators/shade_mover.py`) | Moves the stepper; a full open/close takes ~3 s |
+| ultrasonic (`sensors/ultrasonic_watcher.py`) | Measures the HC-SR04 non-stop (~5× per second); one distance takes ~0.2 s |
+| MQTT network (paho `loop_start()`) | Sends and receives; seat messages from the Pico arrive here |
+
+Without the extra threads, every shade movement (3 s) and every distance
+(0.2 s) would block the main loop, and a short button press could be missed.
+
+How they share data safely:
+- **Shade:** the main thread only sets a target. The shade thread steps
+  towards it in small chunks and checks the target after each chunk, so a
+  button press turns the shade around at once. The target is protected by a
+  `threading.Condition` (a lock plus a wake-up signal).
+- **Ultrasonic:** the thread writes the newest distance and the time it last
+  saw someone under a `threading.Lock`; the main thread only reads them.
+- **MQTT:** `on_message` does nothing but put the message in a `queue.Queue`;
+  the main thread takes it out and owns all seat and timer state.
+
+At Ctrl+C the shade is driven back to open, the start position every program
+assumes, and the threads are stopped with `join()`.
 
 ## Database
 
