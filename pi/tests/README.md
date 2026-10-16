@@ -49,7 +49,8 @@ the I²C pins 3/5. GPIO18 and GPIO19 belong to SPI1 too and stay free.
 
 ## Before wiring
 
-- HC-SR04 (5 V): voltage divider on ECHO (1 kΩ / 2 kΩ).
+- HC-SR04: VCC on 3.3 V, ECHO straight to GPIO15 (no divider). Only a 5 V-only
+  module needs 5 V plus a 1 kΩ / 1 kΩ divider on ECHO.
 - ULN2003 stepper board: its own 5 V and GND.
 - Relay board: only the IN pin goes to the GPIO; the fan has its own supply
   through COM → NO.

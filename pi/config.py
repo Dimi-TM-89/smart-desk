@@ -59,7 +59,7 @@ class Pins:
     # Stepper motor 28BYJ-48 via ULN2003
     STEPPER = (17, 27, 22, 23)   # IN1, IN2, IN3, IN4
 
-    # Ultrasonic sensor HC-SR04 (voltage divider on ECHO!)
+    # Ultrasonic sensor HC-SR04, powered from 3.3 V: ECHO goes straight to the GPIO
     # GPIO14/15 are the UART pins: the serial port must be off (setup_pi.sh,
     # check_setup.py checks it), otherwise the HC-SR04 cannot claim them.
     US_TRIG = 14

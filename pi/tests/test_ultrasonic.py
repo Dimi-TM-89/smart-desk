@@ -26,15 +26,16 @@ from sensors.ultrasonic import Ultrasonic  # noqa: E402
 def main():
     """Calibrate, then show distance and presence until Ctrl+C."""
     print(f"HC-SR04 on TRIG=GPIO{config.Pins.US_TRIG}, ECHO=GPIO{config.Pins.US_ECHO}")
-    print("Reminder: 5 V sensor -> voltage divider (1k/2k) on ECHO!\n")
+    print("Wiring: VCC on 3.3 V, ECHO direct to the GPIO (no divider).\n")
     sensor = Ultrasonic(config.Pins.US_TRIG, config.Pins.US_ECHO)
     try:
         print("Calibrating baseline, keep the area in front of the sensor empty ...")
         baseline = sensor.calibrate()
         if baseline is None:
             print("FAIL: no echo at all.")
-            print("  - check TRIG/ECHO are not swapped and the sensor has 5 V and GND")
-            print("  - check the voltage divider on ECHO (GND side of the divider!)")
+            print("  - check TRIG/ECHO are not swapped and the sensor has 3.3 V and GND")
+            print("  - a 5 V-only HC-SR04 does not work on 3.3 V: then use 5 V AND a")
+            print("    1k/1k voltage divider on ECHO (never 5 V straight into the GPIO)")
             print("  - GPIO14/15 are the UART pins: raspi-config > Interface > Serial port must be off")
             return
         print(f"Baseline: {baseline:.1f} cm (presence below "

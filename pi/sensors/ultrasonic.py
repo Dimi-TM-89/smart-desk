@@ -5,8 +5,9 @@ Works as in the course (lesson 3): a 10 µs pulse on TRIG starts a measurement,
 the length of the HIGH pulse on ECHO is the time the sound needs to travel to
 the object and back. distance (cm) = time (s) × 34300 / 2 = time × 17150.
 
-Wiring: the 5 V HC-SR04 returns a 5 V ECHO signal. Use a voltage divider
-(1 kΩ / 2 kΩ) between ECHO and the GPIO, otherwise the Pi can be damaged.
+Wiring: VCC on 3.3 V, so ECHO is never higher than 3.3 V and goes straight to
+the GPIO (no voltage divider). Only on 5 V would ECHO give 5 V and need a
+1 kΩ / 1 kΩ divider; a 5 V-only module gives no echo on 3.3 V.
 """
 
 import statistics

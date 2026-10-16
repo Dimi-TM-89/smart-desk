@@ -157,6 +157,7 @@ g.mp.hi .ring { opacity: 1; }
         <li>OLED: SCL → pin 40 (GPIO21), SDA → pin 38 (GPIO20). OLED CS is gone.</li>
         <li>RGB green: GPIO19 → GPIO5 (pin 29).</li>
         <li>HC-SR04: TRIG GPIO20 → GPIO14 (pin 8), ECHO GPIO21 → GPIO15 (pin 10).</li>
+        <li>16 October: HC-SR04 VCC moved from 5 V to 3.3 V (pin 1), ECHO goes straight to pin 10, the voltage divider is gone.</li>
         <li>GPIO18 and GPIO19 now belong to SPI1: leave them free.</li>
       </ul>
     </div>
@@ -188,7 +189,7 @@ g.mp.hi .ring { opacity: 1; }
             <h3>Rules for every step</h3>
             <ul>
               <li>Change wiring only with the Pi <b>off and unplugged</b>: <code>sudo shutdown -h now</code>, wait for the green LED to stop, then pull the USB-C cable.</li>
-              <li>GPIO pins are <b>3.3 V only</b>. Never connect 5 V to a GPIO pin. The only 5 V signal (HC-SR04 ECHO) goes through a voltage divider.</li>
+              <li>GPIO pins are <b>3.3 V only</b>. Never connect 5 V to a GPIO pin. The HC-SR04 runs on 3.3 V, so its ECHO can go straight to the GPIO.</li>
               <li>Every part shares the same GND.</li>
               <li>Check each wire against the header map before you plug the power back in.</li>
             </ul>
@@ -454,24 +455,23 @@ g.mp.hi .ring { opacity: 1; }
     {
       id: "ultrasonic", title: "HC-SR04 ultrasonic sensor", sub: "Detects someone at the entrance of the scale model.",
       test: "python pi/tests/test_ultrasonic.py",
-      parts: ["HC-SR04", "2 × 1 kΩ", "5 jumper wires"],
+      parts: ["HC-SR04", "4 jumper wires"],
       diagrams: [],
       extra: "ultrasonic",
       wireRows: [
-        { from: "VCC", to: { rail: "5v" }, wire: "red" },
+        { from: "VCC", to: { rail: "3v3" }, wire: "orange", note: "3.3 V, not 5 V" },
         { from: "GND", to: { rail: "gnd" }, wire: "black" },
-        { from: "Trig", to: { pi: 8 }, wire: "green", note: "direct, 3.3 V trigger works" },
-        { from: "Echo", to: { pi: 10 }, wire: "green", part: "1 kΩ", note: "through the divider" },
-        { from: "pin-10 row", to: { rail: "gnd" }, wire: "black", part: "1 kΩ", note: "lower half of the divider" }
+        { from: "Trig", to: { pi: 8 }, wire: "green", note: "direct" },
+        { from: "Echo", to: { pi: 10 }, wire: "green", note: "direct, no divider" }
       ],
       before: [
-        "The divider must be in place <b>before</b> the first power-on: Echo gives 5 V, the divider brings it down to 2.5 V (as in the course).",
-        "If the board says HC-SR04P or 3.3 V: power it from 3.3 V and skip the divider.",
+        "VCC on the <b>3.3 V</b> rail: Echo is then never higher than 3.3 V and goes straight to pin 10, no divider needed.",
+        "No or jumpy readings on 3.3 V? Then it is a 5 V-only module. Power off, move VCC to 5 V and put a 1 kΩ / 1 kΩ divider on Echo <b>before</b> powering on again (Echo then gives 5 V).",
         "GPIO14/15 are also the UART pins: <code>sudo raspi-config</code> → Interface Options → Serial Port must be off."
       ],
       pass: "A stable distance to the wall of the model; a hand in front lowers it and shows PRESENT.",
       fail: [
-        "\"no echo at all\": Trig and Echo swapped, no 5 V, or the divider's lower resistor is not on GND.",
+        "\"no echo at all\": Trig and Echo swapped, no 3.3 V, or a 5 V-only module (see above).",
         "Readings jump around: the sensor sees the breadboard or a wire. Aim it clear of the model's edges."
       ]
     },
@@ -555,17 +555,15 @@ g.mp.hi .ring { opacity: 1; }
   const label = (x, y, main, sub, anchor) => '<text x="' + x + '" y="' + y + '"' + (anchor ? ' text-anchor="' + anchor + '"' : "") + '><tspan class="dmain">' + main + "</tspan>" + (sub ? '<tspan class="dsub" dx="6">' + sub + "</tspan>" : "") + "</text>";
 
   function ultrasonicSVG() {
-    let s = '<svg viewBox="0 0 720 250" role="img" aria-label="HC-SR04 with a 1 kΩ / 1 kΩ voltage divider on ECHO">';
+    let s = '<svg viewBox="0 0 720 250" role="img" aria-label="HC-SR04 on 3.3 V with ECHO connected directly">';
     s += '<rect class="cbody" x="12" y="14" width="150" height="196" rx="10"/><text class="ctitle" x="26" y="38">HC-SR04</text>';
     const pins = [["VCC", 70], ["Trig", 110], ["Echo", 150], ["GND", 190]];
     pins.forEach(p => { s += '<text class="plabel" text-anchor="end" x="148" y="' + (p[1] + 4) + '">' + p[0] + '</text><rect class="pad" x="156" y="' + (p[1] - 5) + '" width="12" height="10" rx="2"/>'; });
-    s += wire("M168 70H520", "red") + label(530, 75, "5 V rail", "");
+    s += wire("M168 70H520", "orange") + label(530, 75, "3.3 V rail", "from pin 1");
     s += wire("M168 110H520", "green") + label(530, 115, "Pin 8", "GPIO14 · TRIG");
-    s += wire("M168 150H250", "green") + resH(250, 150, "1 kΩ") + wire("M304 150H520", "green") + label(530, 155, "Pin 10", "GPIO15 · ECHO");
-    s += '<circle class="node" cx="400" cy="150" r="4"/>';
-    s += wire("M400 150V170", "black") + resV(400, 170, "1 kΩ", 1) + wire("M400 220V228", "black") + gnd(400, 228);
-    s += '<text class="symsmall" x="414" y="140">2.5 V when Echo is high</text>';
-    s += wire("M168 190H200V228", "black") + gnd(200, 228) + '<text class="symsmall" x="214" y="244">GND rail</text><text class="symsmall" x="414" y="244">GND rail</text>';
+    s += wire("M168 150H520", "green") + label(530, 155, "Pin 10", "GPIO15 · ECHO");
+    s += '<text class="symsmall" x="300" y="140">direct: 3.3 V when Echo is high</text>';
+    s += wire("M168 190H200V228", "black") + gnd(200, 228) + '<text class="symsmall" x="214" y="244">GND rail</text>';
     return s + "</svg>";
   }
 

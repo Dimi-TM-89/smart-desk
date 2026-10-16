@@ -126,7 +126,7 @@ class DeskController:
             print("        measuring the empty scene (keep the entrance clear) ...")
             baseline = self.ultrasonic.calibrate()
             if baseline is None:
-                print("        no echo: check the wiring / voltage divider on ECHO")
+                print("        no echo: check the wiring (VCC on 3.3 V, TRIG/ECHO not swapped)")
             else:
                 print(f"        baseline {baseline:.1f} cm, presence below "
                       f"{baseline - L.PRESENCE_DROP_CM:.1f} cm")
