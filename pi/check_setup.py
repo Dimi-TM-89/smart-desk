@@ -169,11 +169,13 @@ def shade_button_pin():
                            "run scripts/setup_pi.sh again and reboot (SPI0 still claims GPIO7)")
 
     # The file is fine; the pin is only released after a reboot
-    import board
     import digitalio
 
+    sys.path.insert(0, str(REPO_ROOT / "pi"))
+    from hardware import board_pin
+
     try:
-        pin = digitalio.DigitalInOut(board.D7)
+        pin = digitalio.DigitalInOut(board_pin(7))
     except Exception as exc:  # noqa: BLE001 – lgpio says "GPIO busy"
         raise RuntimeError(f"GPIO7 is still in use ({exc}) – reboot the Pi") from exc
     try:

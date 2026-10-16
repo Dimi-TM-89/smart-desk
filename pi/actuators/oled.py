@@ -19,7 +19,7 @@ from hardware import board_pin
 
 
 class Oled:
-    """Text display: show up to ~5 lines of text."""
+    """Text display: up to 5 lines of text, or a few centred lines (standby, alerts)."""
 
     def __init__(self, spi, cs_gpio, dc_gpio, rst_gpio, width=128, height=64):
         """Create the display on an existing SPI bus and clear it.
@@ -37,7 +37,8 @@ class Oled:
         self.height = height
         self.font = ImageFont.load_default()
         bbox = self.font.getbbox("Ag")
-        self.line_height = bbox[3] - bbox[1] + 3
+        # 5 lines on 64 px (12 px each), or more room if the font is taller
+        self.line_height = max(bbox[3] - bbox[1] + 1, height // 5)
         self.clear()
 
     def new_canvas(self):
@@ -58,6 +59,19 @@ class Oled:
             if y + self.line_height > self.height + 2:
                 break
             draw.text((0, y), str(line), font=self.font, fill=255)
+            y += self.line_height
+        self.show_image(image)
+
+    def show_centered(self, lines, inverted=False):
+        """Show a few lines centred on the screen; inverted=True gives black text on white (alerts)."""
+        image, draw = self.new_canvas()
+        if inverted:
+            draw.rectangle((0, 0, self.width - 1, self.height - 1), fill=255)
+        y = max(0, (self.height - len(lines) * self.line_height) // 2)
+        for line in lines:
+            text = str(line)
+            width = draw.textlength(text, font=self.font)
+            draw.text(((self.width - width) // 2, y), text, font=self.font, fill=0 if inverted else 255)
             y += self.line_height
         self.show_image(image)
 

@@ -59,13 +59,18 @@ class Database:
                 pass
             self.conn = None
 
+    def connection(self):
+        """The open connection; connects first when there is none (raises if that fails)."""
+        if self.conn is None:
+            self.connect()
+        assert self.conn is not None    # connect() either sets it or raises
+        return self.conn
+
     def _execute(self, sql, params=()):
         """Run one write statement and return the new row id; reconnect once if the connection was lost."""
         for attempt in (1, 2):
             try:
-                if self.conn is None:
-                    self.connect()
-                cursor = self.conn.cursor()
+                cursor = self.connection().cursor()
                 cursor.execute(sql, params)
                 row_id = cursor.lastrowid
                 cursor.close()
@@ -77,9 +82,7 @@ class Database:
 
     def _query(self, sql, params=()):
         """Run one SELECT and return the rows as a list of dicts."""
-        if self.conn is None:
-            self.connect()
-        cursor = self.conn.cursor(dictionary=True)
+        cursor = self.connection().cursor(dictionary=True)
         cursor.execute(sql, params)
         rows = cursor.fetchall()
         cursor.close()

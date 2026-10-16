@@ -4,8 +4,8 @@ desk_controller.py – Main program of the Smart Desk (runs on the Raspberry Pi 
 Responsibilities (built in layers, see README "Running the Smart Desk"):
     1. read all sensors and publish desk/env                       <- done
     2. climate rules: PWM lamp, sunshade, fan (+ button override)  <- done
-    3. presence (ultrasonic), seat (Pico over MQTT), seated timer, movement alert  <- this layer
-    4. posture input (RGB LED) and the OLED status screen
+    3. presence (ultrasonic), seat (Pico over MQTT), seated timer, movement alert  <- done
+    4. posture input (RGB LED, posture warning) and the OLED status screen     <- this layer
 db_logger.py stores what this program publishes in MariaDB, cloud_bridge.py
 sends it to ThingSpeak.
 
@@ -47,6 +47,22 @@ Layer 3 – presence and seat:
                SEATED_LIMIT_S while the person keeps sitting.
 Published every SENSOR_INTERVAL_S: desk/presence "1"/"0", desk/seated "12.5" (minutes).
 
+Layer 4 – posture and OLED:
+    Posture    posture_ai.py publishes desk/posture {"state": "good|bad|none", "angle"}.
+               RGB LED: green = good, red = bad, blue = nobody in view or no
+               posture data (posture_ai.py not running), off = standby.
+               Bad posture for BAD_POSTURE_AFTER_S -> warning on desk/alert,
+               at most once per ALERT_COOLDOWN_S.
+    OLED       Status screen, refreshed every second:
+                   SMART DESK      14:32
+                   Desk  312lx (>300)
+                   23.5C  Fan ON   man
+                   Shade 100%     auto
+                   Seat 12m  Posture OK
+               "man" = set by a button, "auto" = set by the rule.
+               In standby: "Standby" and the time. When an alert is sent, it
+               fills the screen (inverted) for ALERT_SCREEN_S.
+
 Multithreading – this program runs four threads:
     main thread    buttons (20x per second), sensors and rules (every second)
     shade          actuators/shade_mover.py: the stepper needs ~3 s for a full
@@ -55,9 +71,9 @@ Multithreading – this program runs four threads:
     ultrasonic     sensors/ultrasonic_watcher.py: one distance takes ~0.2 s, so
                    it is measured non-stop in the background (~5x per second)
                    and the main thread only reads the newest value.
-    MQTT network   paho-mqtt's loop_start(). Seat messages from the Pico arrive
+    MQTT network   paho-mqtt's loop_start(). Seat and posture messages arrive
                    on that thread; they go through a queue.Queue to the main
-                   thread, which owns all the seat state.
+                   thread, which owns all the seat and posture state.
 
 Parts that are not connected (yet) are reported at startup and skipped: the
 program keeps running with the rest. That way every part can be added and
@@ -81,6 +97,8 @@ import config
 import hardware
 from actuators.fan import Fan
 from actuators.lamp import Lamp
+from actuators.oled import Oled
+from actuators.rgb_led import RgbLed
 from actuators.shade import Shade
 from actuators.shade_mover import ShadeMover
 from sensors.adc import AnalogInputs
@@ -188,11 +206,43 @@ class ManualOverride:
         return self.state if self.active else auto
 
 
+def posture_colour(present, posture):
+    """RGB LED colour: off in standby, else green/red for good/bad, blue for none or unknown."""
+    if not present:
+        return "off"
+    return {"good": "green", "bad": "red"}.get(posture, "blue")
+
+
+def status_lines(clock, env, fan_on, fan_manual, shade_pct, shade_manual,
+                 seated, seated_min, posture):
+    """The 5 lines of the OLED status screen (max. 21 characters = 126 px in the 6 px font).
+
+    env is the dict published on desk/env; missing values are shown as "--".
+    """
+    def num(value, fmt, width):
+        return "--".rjust(width) if value is None else format(value, fmt).rjust(width)
+
+    mode = {True: "man", False: "auto"}
+    fan = "--" if fan_on is None else ("ON" if fan_on else "off")
+    shade = num(shade_pct, ".0f", 3)
+    minutes = int(seated_min)
+    seat = ("-" if not seated else f"{minutes}m" if minutes < 100 else f"{minutes // 60}h{minutes % 60:02d}")
+    posture_text = {"good": "OK", "bad": "BAD"}.get(posture or "", "-")   # none or unknown: "-"
+    lines = [
+        f"SMART DESK{clock:>10}",
+        f"Desk {num(env['lux'], '.0f', 4)}lx (>{num(env['threshold'], '.0f', 3).strip()})",
+        f"{num(env['temp'], '.1f', 4)}C  Fan {fan:<4}{mode[fan_manual] if fan_on is not None else ''}",
+        f"Shade {shade}%  {mode[shade_manual] if shade_pct is not None else ''}",
+        f"Seat {seat:<4} Posture {posture_text}",
+    ]
+    return [line[:21] for line in lines]
+
+
 # ---------------------------------------------------------------------------
 # The controller
 # ---------------------------------------------------------------------------
 class DeskController:
-    """Sensors (layer 1), climate rules (layer 2), presence and seat (layer 3)."""
+    """Sensors (layer 1), climate rules (layer 2), presence and seat (layer 3), posture and OLED (layer 4)."""
 
     def __init__(self):
         """Prepare the rules and the MQTT client; the hardware is opened in setup_hardware()."""
@@ -207,6 +257,8 @@ class DeskController:
         self.shade = None           # ShadeMover (the Shade runs in its own thread)
         self._stepper = None        # the Shade itself, released at the end
         self.shade_button = None    # Button
+        self.rgb = None             # RgbLed (posture feedback)
+        self.oled = None            # Oled (local dashboard)
 
         # Layer 2 rules
         self.lamp_target = 0.0      # level the lamp fades towards (%)
@@ -223,6 +275,16 @@ class DeskController:
         self.seated_since = None    # start of the current sitting session
         self.left_seat_at = None    # when the person last stood up
         self.next_move_alert = None # when the next movement reminder is due
+
+        # Layer 4: posture and OLED (only used by the main thread)
+        self.posture = None         # "good" / "bad" / "none", None = no (recent) data
+        self.posture_angle = None
+        self.posture_at = None      # time.monotonic() of the last desk/posture message
+        self.bad_since = None       # start of the current bad-posture period
+        self.last_posture_alert = None
+        self.alert_screen = None    # lines shown full-screen after an alert
+        self.alert_screen_until = 0.0
+        self._env = None            # newest desk/env values, for the OLED
 
         self._buses = []            # I2C / SPI buses, released at the end
         self._last_warning = {}     # sensor name -> time of the last warning
@@ -296,6 +358,17 @@ class DeskController:
         if self.shade_button is None:
             print("        GPIO7 is freed by dtoverlay=spi0-1cs + reboot (scripts/setup_pi.sh)")
 
+        self.rgb = self._try(f"RGB posture LED (GPIO {P.RGB_RED}/{P.RGB_GREEN}/{P.RGB_BLUE})",
+                             lambda: RgbLed(P.RGB_RED, P.RGB_GREEN, P.RGB_BLUE))
+        spi1 = self._try("SPI1 bus (GPIO21/20)", hardware.make_spi1)
+        if spi1 is None:
+            print("        needs dtoverlay=spi1-1cs + reboot (scripts/setup_pi.sh)")
+        else:
+            self._buses.append(spi1)
+            self.oled = self._try(f"OLED display (DC {P.OLED_DC}, RES {P.OLED_RST})",
+                                  lambda: Oled(spi1, P.OLED_CS, P.OLED_DC, P.OLED_RST,
+                                               config.OLED_WIDTH, config.OLED_HEIGHT))
+
     # --- MQTT --------------------------------------------------------------
     def _on_connect(self, client, userdata, flags, reason_code, properties):
         """Report the connection to the local broker."""
@@ -305,7 +378,7 @@ class DeskController:
             print(f"[mqtt] connected to {config.MQTT_HOST}:{config.MQTT_PORT}")
             # (Re)subscribe on every connect; the Pico's retained message
             # arrives at once, so the seat state is known right away
-            client.subscribe(T.CHAIR)
+            client.subscribe([(T.CHAIR, 0), (T.POSTURE, 0)])
 
     def _on_message(self, client, userdata, msg):
         """Runs on the MQTT thread: only hand the message to the main thread."""
@@ -449,6 +522,25 @@ class DeskController:
                     self.seat_changed(payload == "1")
                 else:
                     print(f"[seat] ignored unknown payload {payload!r}")
+            elif topic == T.POSTURE:
+                self.posture_received(payload)
+
+    def posture_received(self, payload):
+        """posture_ai.py sends {"state": "good|bad|none", "angle": 12.3}."""
+        try:
+            data = json.loads(payload)
+            state = data["state"]
+        except (ValueError, KeyError, TypeError):
+            print(f"[posture] ignored unreadable payload {payload!r}")
+            return
+        if state not in ("good", "bad", "none"):
+            print(f"[posture] ignored unknown state {state!r}")
+            return
+        if state != self.posture:
+            print(f"[posture] {state}" + (f" ({data.get('angle')}°)" if data.get("angle") is not None else ""))
+        self.posture = state
+        self.posture_angle = data.get("angle")
+        self.posture_at = time.monotonic()
 
     def seat_changed(self, seated):
         """The Pico reports a new seat state."""
@@ -462,7 +554,7 @@ class DeskController:
                 self.seated_since = now
                 self.next_move_alert = now + L.SEATED_LIMIT_S
                 print("[seat] sat down – timer started")
-            else:
+            elif self.left_seat_at is not None:
                 print(f"[seat] back after {now - self.left_seat_at:.0f} s – timer goes on")
             self.left_seat_at = None
         else:
@@ -492,6 +584,7 @@ class DeskController:
             text = f"Seated for {self.seated_minutes:.0f} min: time to move – 10 squats or a short walk"
             self.publish(T.ALERT, text)
             print(f"[alert] {text}")
+            self.show_alert(["TIME TO MOVE!", "", "10 squats or", "a short walk"])
 
         # Presence: the entrance sensor and the seat count as activity
         if self.ultrasonic is not None:
@@ -500,7 +593,8 @@ class DeskController:
                 self.activity("entrance")
         if self.seated:
             self.activity("seat")
-        if self.present and now - self.last_activity >= L.STANDBY_AFTER_S:
+        if (self.present and self.last_activity is not None
+                and now - self.last_activity >= L.STANDBY_AFTER_S):
             self.present = False
             print(f"[presence] nobody for {L.STANDBY_AFTER_S} s – standby")
 
@@ -510,13 +604,80 @@ class DeskController:
             print(f"[sensor] ultrasonic thread stopped: {self.ultrasonic.error} – entrance detection off")
             self.ultrasonic = None
 
+    # --- layer 4: posture and OLED --------------------------------------------
+    def update_posture(self):
+        """Once per reading: forget stale posture data and send a warning after long bad posture."""
+        now = time.monotonic()
+        if self.posture is not None and self.posture_at is not None and now - self.posture_at > L.POSTURE_STALE_S:
+            print(f"[posture] no data for {L.POSTURE_STALE_S} s (is posture_ai.py running?)")
+            self.posture = None
+
+        if not (self.present and self.posture == "bad"):
+            self.bad_since = None
+            return
+        if self.bad_since is None:
+            self.bad_since = now
+        cooled_down = self.last_posture_alert is None or now - self.last_posture_alert >= L.ALERT_COOLDOWN_S
+        if now - self.bad_since >= L.BAD_POSTURE_AFTER_S and cooled_down:
+            self.last_posture_alert = now
+            text = f"Bad posture for {now - self.bad_since:.0f} s: sit up straight, shoulders back"
+            self.publish(T.ALERT, text)
+            print(f"[alert] {text}")
+            self.show_alert(["SIT UP STRAIGHT", "", "shoulders back"])
+
+    def update_rgb(self):
+        """Show the posture on the RGB LED (only switches pins when the colour changes)."""
+        rgb = self.rgb
+        if rgb is None:
+            return
+        colour = posture_colour(self.present, self.posture)
+        if colour != rgb.colour:
+            self._display("RGB LED", lambda: rgb.set(colour))
+
+    def show_alert(self, lines):
+        """Fill the OLED with an alert for ALERT_SCREEN_S."""
+        self.alert_screen = lines
+        self.alert_screen_until = time.monotonic() + L.ALERT_SCREEN_S
+        self.update_oled()
+
+    def update_oled(self):
+        """Draw the right screen: alert, standby or the status lines."""
+        oled = self.oled
+        if oled is None or self._env is None:
+            return
+        clock = time.strftime("%H:%M")
+        if self.alert_screen is not None and time.monotonic() < self.alert_screen_until:
+            lines = self.alert_screen
+            self._display("OLED", lambda: oled.show_centered(lines, inverted=True))
+        elif not self.present:
+            self._display("OLED", lambda: oled.show_centered(["Standby", "", clock]))
+        else:
+            lines = status_lines(
+                clock, self._env,
+                fan_on=self.fan.is_on if self.fan else None, fan_manual=self.fan_override.active,
+                shade_pct=self.shade.percent if self.shade else None,
+                shade_manual=self.shade_override.active,
+                seated=self.seated, seated_min=self.seated_minutes, posture=self.posture)
+            self._display("OLED", lambda: oled.show_lines(lines))
+
+    def _display(self, name, func):
+        """Drive an output; a glitch gives a rate-limited warning instead of stopping the desk."""
+        try:
+            func()
+        except Exception as exc:  # noqa: BLE001
+            now = time.monotonic()
+            if now - self._last_warning.get(name, -WARN_EVERY_S) >= WARN_EVERY_S:
+                self._last_warning[name] = now
+                print(f"[output] cannot update {name}: {exc}")
+
     def publish_status(self):
         """Publish desk/presence and desk/seated; returns what was sent (for the console line)."""
         presence = "1" if self.present else "0"
         seated = f"{self.seated_minutes:.1f}"
         self.publish(T.PRESENCE, presence)
         self.publish(T.SEATED, seated)
-        return {"present": presence, "seat": "1" if self.seated else "0", "seated_min": seated}
+        return {"present": presence, "seat": "1" if self.seated else "0", "seated_min": seated,
+                "posture": self.posture}
 
     def publish_actuators(self):
         """Publish lamp %, fan on/off and shade % on desk/actuators; returns what was sent."""
@@ -548,6 +709,7 @@ class DeskController:
                 now = time.monotonic()
                 self.poll_buttons()
                 self.handle_messages()
+                self.update_rgb()
                 if now >= next_read:
                     # never "catch up" with a burst when a read took long
                     next_read = max(next_read + L.SENSOR_INTERVAL_S, now)
@@ -558,6 +720,9 @@ class DeskController:
                     self.check_shade_thread()
                     env = self.publish_env(values)
                     act = self.publish_actuators()
+                    self.update_posture()
+                    self._env = env
+                    self.update_oled()
                     status = self.publish_status()
                     print("  " + "  ".join(f"{k}={'–' if v is None else v}"
                                            for k, v in {**env, **act, **status}.items()))
@@ -579,7 +744,7 @@ class DeskController:
         if self.ultrasonic is not None:
             self.ultrasonic.stop()                   # ends the ultrasonic thread
         for part in (self.lamp, self.fan, self._stepper, self.fan_button, self.shade_button,
-                     self.adc, self._sonar):
+                     self.rgb, self.oled, self.adc, self._sonar):
             if part is not None:
                 try:
                     part.deinit()

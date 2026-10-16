@@ -184,6 +184,28 @@ is in charge again. All limits are in `config.Limits`.
 
 The controller starts in standby; walk in, sit down or press a button to wake it.
 
+### Posture feedback and OLED (desk_controller.py, layer 4)
+
+| Input | Effect |
+|---|---|
+| `desk/posture` good / bad | RGB LED green / red |
+| `desk/posture` none, or no message for 5 s (`posture_ai.py` not running) | RGB LED blue, OLED shows `Posture -` |
+| Bad posture for `BAD_POSTURE_AFTER_S` (10 s) | Warning on `desk/alert` (→ ntfy), at most once per `ALERT_COOLDOWN_S` (demo 1 min) |
+| Standby | RGB LED off, OLED shows `Standby` and the time |
+
+OLED status screen (refreshed every second; `man` = set by a button, `auto` = set by the rule):
+
+```
+SMART DESK      14:32
+Desk  312lx (>300)
+23.5C  Fan ON  man
+Shade 100%  auto
+Seat 12m  Posture OK
+```
+
+When a movement reminder or posture warning is sent, it fills the screen
+(black on white) for 5 s: `TIME TO MOVE!` or `SIT UP STRAIGHT`.
+
 ### Multithreading
 
 `desk_controller.py` runs four threads (course lesson 5):
@@ -193,7 +215,7 @@ The controller starts in standby; walk in, sit down or press a button to wake it
 | main | Buttons (20× per second), sensors and rules (every second), publishing |
 | shade (`actuators/shade_mover.py`) | Moves the stepper; a full open/close takes ~3 s |
 | ultrasonic (`sensors/ultrasonic_watcher.py`) | Measures the HC-SR04 non-stop (~5× per second); one distance takes ~0.2 s |
-| MQTT network (paho `loop_start()`) | Sends and receives; seat messages from the Pico arrive here |
+| MQTT network (paho `loop_start()`) | Sends and receives; seat (Pico) and posture (`posture_ai.py`) messages arrive here |
 
 Without the extra threads, every shade movement (3 s) and every distance
 (0.2 s) would block the main loop, and a short button press could be missed.
@@ -206,7 +228,7 @@ How they share data safely:
 - **Ultrasonic:** the thread writes the newest distance and the time it last
   saw someone under a `threading.Lock`; the main thread only reads them.
 - **MQTT:** `on_message` does nothing but put the message in a `queue.Queue`;
-  the main thread takes it out and owns all seat and timer state.
+  the main thread takes it out and owns all seat, timer and posture state.
 
 At Ctrl+C the shade is driven back to open, the start position every program
 assumes, and the threads are stopped with `join()`.

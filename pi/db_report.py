@@ -16,6 +16,7 @@ no screen needed). Open it in VS Code or copy it into the report.
 
 import argparse
 from datetime import timedelta
+from typing import Any, Callable
 
 import mariadb
 
@@ -68,7 +69,7 @@ def with_gaps(rows):
     return result
 
 
-def series(rows, key, convert=float):
+def series(rows, key, convert: Callable[[Any], float] = float):
     """Values of one column for matplotlib; missing values become NaN (= no line there)."""
     nan = float("nan")
     return [nan if row.get(key) is None else convert(row[key]) for row in rows]

@@ -132,8 +132,12 @@ class Limits:
 
     # Posture
     BAD_POSTURE_ANGLE = 25   # degrees forward lean of the neck
-    BAD_POSTURE_AFTER_S = 10
-    ALERT_COOLDOWN_S = 60 if DEMO_MODE else 300
+    BAD_POSTURE_AFTER_S = 10 # bad this long -> posture warning on desk/alert
+    ALERT_COOLDOWN_S = 60 if DEMO_MODE else 300   # at most one posture warning per cooldown
+    POSTURE_STALE_S = 5      # no desk/posture message for this long = posture unknown (posture_ai stopped?)
+
+    # OLED: how long an alert ("Time to move!", posture warning) fills the screen
+    ALERT_SCREEN_S = 5
 
 
 # ---------------------------------------------------------------------------
