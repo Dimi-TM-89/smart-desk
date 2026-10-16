@@ -153,14 +153,40 @@ def serial_port_off():
     return "GPIO14/15 free for the ultrasonic sensor"
 
 
-def hardware_pwm():
-    """GPIO12 is routed to the PWM block and the sysfs PWM channel is usable."""
-    active_lines = [
+def _active_config_lines():
+    """Lines of /boot/firmware/config.txt that are not commented out."""
+    return [
         line.strip()
         for line in CONFIG_TXT.read_text().splitlines()
         if not line.lstrip().startswith("#")
     ]
-    if "dtoverlay=pwm,pin=12,func=4" not in active_lines:
+
+
+def shade_button_pin():
+    """GPIO7 is free for the shade button: SPI0 keeps only CE0 (dtoverlay=spi0-1cs)."""
+    if "dtoverlay=spi0-1cs" not in _active_config_lines():
+        raise RuntimeError("dtoverlay=spi0-1cs missing in /boot/firmware/config.txt – "
+                           "run scripts/setup_pi.sh again and reboot (SPI0 still claims GPIO7)")
+
+    # The file is fine; the pin is only released after a reboot
+    import board
+    import digitalio
+
+    try:
+        pin = digitalio.DigitalInOut(board.D7)
+    except Exception as exc:  # noqa: BLE001 – lgpio says "GPIO busy"
+        raise RuntimeError(f"GPIO7 is still in use ({exc}) – reboot the Pi") from exc
+    try:
+        pin.switch_to_input(pull=digitalio.Pull.UP)
+        pressed = not pin.value
+    finally:
+        pin.deinit()
+    return "GPIO7 free" + (" – it reads LOW: button held down, or wired to GND directly?" if pressed else "")
+
+
+def hardware_pwm():
+    """GPIO12 is routed to the PWM block and the sysfs PWM channel is usable."""
+    if "dtoverlay=pwm,pin=12,func=4" not in _active_config_lines():
         raise RuntimeError("overlay missing in /boot/firmware/config.txt – "
                            "run scripts/setup_pi.sh again and reboot")
 
@@ -189,6 +215,7 @@ if __name__ == "__main__":
     check("I2C / SPI0 / SPI1 enabled", interfaces)
     check("Hardware PWM GPIO12", hardware_pwm)
     check("Serial port off (GPIO14/15)", serial_port_off)
+    check("Shade button pin free (GPIO7)", shade_button_pin)
     check("I2C scan", i2c_devices)
     check("Mosquitto broker", mqtt_broker)
     check(".env file", env_file)

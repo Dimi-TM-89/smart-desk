@@ -13,7 +13,8 @@ shade is fully OPEN, so put it in that position before starting a program
 (test_stepper.py has a jog option for that).
 
 move_to() blocks until the movement is finished (about 3 s for a full
-open/close). In desk_controller.py run it in a separate thread.
+open/close). desk_controller.py therefore drives the shade through
+shade_mover.py, which runs the movement in a thread of its own.
 """
 
 import time
@@ -61,11 +62,13 @@ class Shade:
         """Current position, 0 % (open) – 100 % (closed)."""
         return self.position * 100 / self.full_steps
 
-    def step(self, count):
+    def step(self, count, release=True):
         """Move a number of half steps: positive = closing, negative = opening.
 
         Does not check the limits – used by move_to() and to jog the shade
-        into its start position.
+        into its start position. release=False keeps the coils powered at the
+        end, so a movement made of several short calls (shade_mover.py) runs
+        smoothly; call release() when it is finished.
         """
         sign = 1 if count > 0 else -1
         for _ in range(abs(count)):
@@ -74,7 +77,8 @@ class Shade:
                 pin.value = bool(on)
             self.position += sign
             time.sleep(STEP_DELAY_S)
-        self.release()
+        if release:
+            self.release()
 
     def move_to(self, percent):
         """Move to a position 0 % (open) – 100 % (closed). Blocks until done."""

@@ -4,6 +4,9 @@ test_stepper.py – Test the sunshade stepper (28BYJ-48 + ULN2003 on GPIO 17/27/
     python pi/tests/test_stepper.py            close, wait, open (full movement)
     python pi/tests/test_stepper.py --jog 200  move 200 half steps (negative = other way)
     python pi/tests/test_stepper.py --reverse  same test with the direction reversed
+    python pi/tests/test_stepper.py --button   shade button (GPIO7) + shade thread:
+                                               every press toggles open/closed, also
+                                               while the shade is still moving
 
 Use --jog to put the shade in its OPEN start position: every program assumes
 the shade is open when it starts.
@@ -14,6 +17,8 @@ half a turn (Limits.SHADE_STEPS half steps) one way, then back.
     Shade moves the wrong way  -> try --reverse; if that is right, the
                                   controller must create Shade(..., reverse=True).
     Nothing at all             -> the ULN2003 board needs 5 V and GND.
+    --button: "GPIO busy"      -> dtoverlay=spi0-1cs is missing, or no reboot yet
+                                  (scripts/setup_pi.sh, python pi/check_setup.py).
 """
 
 import sys
@@ -24,6 +29,35 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # make pi/ impo
 
 import config  # noqa: E402
 from actuators.shade import Shade  # noqa: E402
+from actuators.shade_mover import ShadeMover  # noqa: E402
+from sensors.button import Button  # noqa: E402
+
+
+def button_test(shade):
+    """Toggle the shade with the button; the main thread keeps printing the position.
+
+    The printing goes on WHILE the motor turns: that is the shade thread at work.
+    """
+    print(f"Shade button on GPIO{config.Pins.SHADE_BUTTON}: press it to toggle (Ctrl+C to stop).")
+    button = Button(config.Pins.SHADE_BUTTON)
+    mover = ShadeMover(shade)
+    last_print = 0
+    try:
+        while True:
+            if button.was_pressed():
+                target = 0 if mover.target >= 50 else 100
+                mover.move_to(target)
+                print(f"  button -> {'closing' if target else 'opening'}")
+            now = time.monotonic()
+            if mover.moving and now - last_print >= 0.25:
+                last_print = now
+                print(f"    main thread still running: shade at {mover.percent:3.0f} %")
+            time.sleep(0.01)
+    except KeyboardInterrupt:
+        print("\nOpening the shade ...")
+    finally:
+        mover.stop(park=True)
+        button.deinit()
 
 
 def main():
@@ -31,8 +65,12 @@ def main():
     reverse = "--reverse" in sys.argv
     print(f"Stepper on GPIO {config.Pins.STEPPER}, {config.Limits.SHADE_STEPS} half steps "
           f"open -> closed{', REVERSED' if reverse else ''}")
-    shade = Shade(config.Pins.STEPPER, config.Limits.SHADE_STEPS, reverse=reverse)
+    shade = Shade(config.Pins.STEPPER, config.Limits.SHADE_STEPS,
+                  reverse=reverse or config.Pins.STEPPER_REVERSE)
     try:
+        if "--button" in sys.argv:
+            button_test(shade)
+            return
         if "--jog" in sys.argv:
             steps = int(sys.argv[sys.argv.index("--jog") + 1])
             print(f"Jogging {steps} half steps ...")

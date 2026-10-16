@@ -159,6 +159,7 @@ g.mp.hi .ring { opacity: 1; }
         <li>HC-SR04: TRIG GPIO20 → GPIO14 (pin 8), ECHO GPIO21 → GPIO15 (pin 10).</li>
         <li>16 October: HC-SR04 VCC moved from 5 V to 3.3 V (pin 1), ECHO goes straight to pin 10, the voltage divider is gone.</li>
         <li>GPIO18 and GPIO19 now belong to SPI1: leave them free.</li>
+        <li>16 October: new <b>shade button</b> on pin 26 (GPIO7), other leg to GND on pin 25. Needs <code>dtoverlay=spi0-1cs</code> (the updated <code>setup_pi.sh</code> adds it) and a reboot.</li>
       </ul>
     </div>
   </header>
@@ -236,12 +237,12 @@ g.mp.hi .ring { opacity: 1; }
     7: "OLED RES", 31: "OLED DC", 38: "OLED SDA (SPI1 data)", 40: "OLED SCL (SPI1 clock)",
     23: "SPI0 SCLK → MCP3008", 19: "SPI0 MOSI → MCP3008", 21: "SPI0 MISO ← MCP3008", 18: "MCP3008 CS",
     32: "Desk lamp (PWM)", 33: "RGB red", 29: "RGB green", 37: "RGB blue",
-    36: "Fan relay IN1", 22: "Fan button",
+    36: "Fan relay IN1", 22: "Fan button", 26: "Shade button", 25: "GND for the shade button",
     11: "Stepper IN1", 13: "Stepper IN2", 15: "Stepper IN3", 16: "Stepper IN4",
     8: "HC-SR04 TRIG", 10: "HC-SR04 ECHO"
   };
   const RESERVED = {
-    12: "SPI1 CE0 – keep free", 35: "SPI1 MISO – keep free", 24: "SPI0 CE0 – keep free", 26: "SPI0 CE1 – keep free",
+    12: "SPI1 CE0 – keep free", 35: "SPI1 MISO – keep free", 24: "SPI0 CE0 – keep free",
     27: "ID EEPROM – don't use", 28: "ID EEPROM – don't use"
   };
 
@@ -428,9 +429,9 @@ g.mp.hi .ring { opacity: 1; }
       ]
     },
     {
-      id: "stepper", title: "Stepper sunshade (28BYJ-48 + ULN2003)", sub: "Closes the shade when the window light is too strong.",
-      test: "python pi/tests/test_stepper.py",
-      parts: ["28BYJ-48 motor", "ULN2003 driver board", "6 jumper wires"],
+      id: "stepper", title: "Stepper sunshade + shade button", sub: "Closes the shade when the window light is too strong; the button toggles it by hand.",
+      test: "python pi/tests/test_stepper.py --button",
+      parts: ["28BYJ-48 motor", "ULN2003 driver board", "Push button", "8 jumper wires"],
       diagrams: [
         { title: "ULN2003 board", rows: [
           { from: "IN1", to: { pi: 11 }, wire: "green" },
@@ -439,17 +440,22 @@ g.mp.hi .ring { opacity: 1; }
           { from: "IN4", to: { pi: 16 }, wire: "green" },
           { from: "+ (5–12 V)", to: { rail: "5v" }, wire: "red" },
           { from: "−", to: { rail: "gnd" }, wire: "black" },
-          { from: "motor plug", to: { open: "white socket on the board, fits one way" } } ] }
+          { from: "motor plug", to: { open: "white socket on the board, fits one way" } } ] },
+        { title: "Shade button", rows: [
+          { from: "leg A", to: { pi: 26 }, wire: "green" },
+          { from: "leg B (diagonal)", to: { pi: 25 }, wire: "black", note: "GND right next to it" } ] }
       ],
       before: [
         "IN1–IN4 in this exact order. A wrong order makes the motor buzz without turning.",
+        "Shade button: GPIO7 belongs to SPI0 until <code>dtoverlay=spi0-1cs</code> is in <code>/boot/firmware/config.txt</code> and the Pi has rebooted. <code>python pi/check_setup.py</code> shows \"GPIO7 free\" when it is ready. Same diagonal-leg rule as the fan button, no resistor (internal pull-up).",
         "The board needs 5 V on +; the motor will not run on 3.3 V.",
         "The ON/OFF jumper on the board must be on."
       ],
-      pass: "The 4 LEDs on the board blink in sequence and the motor turns half a turn one way, then back.",
+      pass: "First run it without <code>--button</code>: the 4 LEDs on the board blink in sequence and the motor turns half a turn one way, then back. Then with <code>--button</code>: every press toggles the shade, also while it is still moving.",
       fail: [
         "Shade moves the wrong way: run the test with <code>--reverse</code>.",
-        "Put the shade in its open start position with <code>--jog &lt;steps&gt;</code> before running other programs."
+        "Put the shade in its open start position with <code>--jog &lt;steps&gt;</code> before running other programs.",
+        "<code>--button</code> says GPIO busy: the overlay is missing or the Pi has not rebooted yet."
       ]
     },
     {

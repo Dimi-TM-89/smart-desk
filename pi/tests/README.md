@@ -29,6 +29,7 @@ Wire and test one part at a time. Commit when a test passes.
 | 5 | `test_rgb.py` | RGB LED | 13 / 5 / 26 | Red → green → blue in that order |
 | 6 | `test_fan.py` | Relay + fan button | 16 / 25 | Relay clicks; button toggles the fan |
 | 7 | `test_stepper.py` | Stepper sunshade | 17 / 27 / 22 / 23 | Half a turn one way and back |
+| 7b | `test_stepper.py --button` | Shade button + shade thread | 7 | Each press toggles open/closed, also halfway a movement |
 | 8 | `test_ultrasonic.py` | HC-SR04 | TRIG 14, ECHO 15 | Stable distance, PRESENT when a hand is in front |
 | 9 | `test_mqtt.py` | Mosquitto + Pico | – | `desk/chair/occupied 1/0` when the seat button is pressed |
 
@@ -46,6 +47,10 @@ Never run `simulate_desk.py` together with `desk_controller.py`: both publish th
 Our OLED has no CS pin, so it runs on its own SPI1 bus (GPIO 21/20). Its pins
 are labelled SCL/SDA, but they are SPI: connect them to pins 40/38, **not** to
 the I²C pins 3/5. GPIO18 and GPIO19 belong to SPI1 too and stay free.
+
+The shade button on GPIO7 needs `dtoverlay=spi0-1cs` (added by
+`scripts/setup_pi.sh`) and a reboot, otherwise SPI0 still claims the pin
+("GPIO busy"). `python pi/check_setup.py` checks it.
 
 ## Before wiring
 

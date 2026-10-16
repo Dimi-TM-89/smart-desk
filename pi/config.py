@@ -58,6 +58,12 @@ class Pins:
 
     # Stepper motor 28BYJ-48 via ULN2003
     STEPPER = (17, 27, 22, 23)   # IN1, IN2, IN3, IN4
+    STEPPER_REVERSE = False      # True if the shade moves the wrong way (test_stepper.py --reverse)
+
+    # Shade button: toggles the sunshade open/closed. GPIO7 is SPI0 CE1; the
+    # overlay dtoverlay=spi0-1cs (setup_pi.sh) lets SPI0 keep only CE0 (GPIO8),
+    # which we do not use either (the MCP3008 has its own CS on GPIO24).
+    SHADE_BUTTON = 7         # to GND, internal pull-up (header pin 26, GND on pin 25)
 
     # Ultrasonic sensor HC-SR04, powered from 3.3 V: ECHO goes straight to the GPIO
     # GPIO14/15 are the UART pins: the serial port must be off (setup_pi.sh,
@@ -67,7 +73,7 @@ class Pins:
 
     # Fan
     FAN_RELAY = 16           # relay input is active LOW
-    FAN_BUTTON = 25          # to GND, internal pull-up
+    FAN_BUTTON = 25          # to GND, internal pull-up (toggles the fan)
 
 
 # I2C addresses
@@ -92,6 +98,15 @@ class Limits:
     # Desk light: the potentiometer maps to this lux range
     LUX_THRESHOLD_MIN = 50
     LUX_THRESHOLD_MAX = 600
+
+    # Desk lamp control (closed loop: the lamp itself also lights the BH1750).
+    # Every sensor reading the lamp level moves by LAMP_GAIN x the relative
+    # shortfall ((threshold - lux) / threshold), at most LAMP_MAX_STEP %.
+    # Lamp pumps up and down? Lower LAMP_GAIN.
+    LAMP_GAIN = 30           # % per reading at 100 % shortfall
+    LAMP_MAX_STEP = 20       # % per reading (0 -> 100 % in about 5 s)
+    LAMP_DEADBAND = 0.05     # +/- 5 % around the threshold counts as "right"
+    LAMP_FADE_PER_S = 40     # the LEDs follow the new level smoothly at this speed
 
     # Window light (0–100 %) with hysteresis so the shade does not flutter
     SHADE_CLOSE_ABOVE = 70
