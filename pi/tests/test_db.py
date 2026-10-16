@@ -46,7 +46,7 @@ def main():
     print(f"OK   connected as {config.DB_USER}@{config.DB_HOST} to database {config.DB_NAME}")
 
     try:
-        cursor = db.conn.cursor()
+        cursor = db.connection().cursor()
         cursor.execute("SHOW TABLES")
         found = {row[0] for row in cursor.fetchall()}
         missing = [t for t in TABLES if t not in found]
