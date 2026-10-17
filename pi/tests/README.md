@@ -32,6 +32,8 @@ Wire and test one part at a time. Commit when a test passes.
 | 7b | `test_stepper.py --button` | Shade button + shade thread | 7 | Each press toggles open/closed, also halfway a movement |
 | 8 | `test_ultrasonic.py` | HC-SR04 | TRIG 14, ECHO 15 | Stable distance, PRESENT when a hand is in front |
 | 9 | `test_mqtt.py` | Mosquitto + Pico | – | `desk/chair/occupied 1/0` when the seat button is pressed |
+| 10 | `../posture_ai.py --image photo.jpg` | Pose model on the scale-model photos | – | Upright photo: `good` (< 22°), hunched photo: `bad` (> 25°) |
+| 11 | `../posture_ai.py --show` | Webcam + pose model live | USB | Skeleton on the person, angle changes when you lean forward |
 
 ## Cloud and database (no hardware needed)
 

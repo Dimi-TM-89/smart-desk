@@ -56,6 +56,27 @@ def ai_packages():
     importlib.import_module("cv2")
 
 
+def webcam():
+    """Optional: the USB webcam for posture_ai.py gives a picture."""
+    sys.path.insert(0, str(REPO_ROOT / "pi"))
+    import config
+    import cv2
+
+    cap = cv2.VideoCapture(config.CAMERA_INDEX)
+    try:
+        if not cap.isOpened():
+            raise RuntimeError(f"camera {config.CAMERA_INDEX} not found – plugged in? v4l2-ctl --list-devices")
+        ok, frame = cap.read()
+        if not ok:
+            raise RuntimeError("camera found, but it gives no picture (in use by another program?)")
+        height, width = frame.shape[:2]
+    finally:
+        cap.release()
+    model = config.MODEL_DIR / f"{config.POSE_MODEL}_ncnn_model"
+    return (f"camera {config.CAMERA_INDEX} gives {width}x{height}; "
+            + ("NCNN model ready" if model.exists() else "model is downloaded on the first run of posture_ai.py"))
+
+
 def interfaces():
     """I2C, SPI0 (MCP3008) and SPI1 (OLED) device files exist."""
     missing = [d for d in ("/dev/i2c-1", "/dev/spidev0.0", "/dev/spidev1.0")
@@ -214,6 +235,7 @@ if __name__ == "__main__":
         print("           Run first:  source .venv/bin/activate\n")
     check("Python packages", python_packages)
     check("AI packages (optional)", ai_packages)
+    check("Webcam (optional)", webcam)
     check("I2C / SPI0 / SPI1 enabled", interfaces)
     check("Hardware PWM GPIO12", hardware_pwm)
     check("Serial port off (GPIO14/15)", serial_port_off)

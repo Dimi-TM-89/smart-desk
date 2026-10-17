@@ -130,8 +130,10 @@ class Limits:
     # desk_controller.py: how often the sensors are read and desk/env is published
     SENSOR_INTERVAL_S = 1.0
 
-    # Posture
-    BAD_POSTURE_ANGLE = 25   # degrees forward lean of the neck
+    # Posture (posture_ai.py): neck angle = how far the ear is in front of the
+    # shoulder, seen from the side. 0° = ear straight above the shoulder.
+    BAD_POSTURE_ANGLE = 25   # degrees forward lean of the neck: above = bad
+    GOOD_POSTURE_ANGLE = 22  # below = good again (hysteresis: no flicker around 25°)
     BAD_POSTURE_AFTER_S = 10 # bad this long -> posture warning on desk/alert
     ALERT_COOLDOWN_S = 60 if DEMO_MODE else 300   # at most one posture warning per cooldown
     POSTURE_STALE_S = 5      # no desk/posture message for this long = posture unknown (posture_ai stopped?)
@@ -188,6 +190,12 @@ DB_LOG_INTERVAL_S = 10       # db_logger.py: one snapshot per interval (duration
 # ---------------------------------------------------------------------------
 # AI
 # ---------------------------------------------------------------------------
-CAMERA_INDEX = 0
-POSE_MODEL = "yolo11n-pose_ncnn_model"   # created once with model.export(format="ncnn")
-AI_FRAME_INTERVAL_S = 1.0
+CAMERA_INDEX = 0                     # /dev/video0 (v4l2-ctl --list-devices)
+CAMERA_WIDTH = 640                   # Logitech C270: 640x480 is plenty and fast
+CAMERA_HEIGHT = 480
+MODEL_DIR = REPO_ROOT / "models"     # not in git (.gitignore); filled on the first run
+POSE_MODEL = "yolo11n-pose"          # models/yolo11n-pose.pt is downloaded once and
+                                     # exported to models/yolo11n-pose_ncnn_model (lesson 8c)
+AI_FRAME_INTERVAL_S = 1.0            # one posture check per second
+KEYPOINT_MIN_CONF = 0.5              # ignore ear/shoulder points the model is unsure about
+POSTURE_SMOOTHING = 3                # median of the last N angles (filters one bad frame)

@@ -206,6 +206,36 @@ Seat 12m  Posture OK
 When a movement reminder or posture warning is sent, it fills the screen
 (black on white) for 5 s: `TIME TO MOVE!` or `SIT UP STRAIGHT`.
 
+### AI posture detection (posture_ai.py)
+
+The Logitech C270 webcam looks at the person **from the side, at shoulder
+height**. Once per second the newest frame goes through **YOLO11n-pose**
+(course lesson 8c), which finds the ear and the shoulder. The neck angle is
+how far the ear is in front of the shoulder:
+
+| Neck angle | Result on `desk/posture` |
+|---|---|
+| above 25° (`BAD_POSTURE_ANGLE`) | `bad` |
+| below 22° (`GOOD_POSTURE_ANGLE`) | `good` (in between: unchanged, so no flicker) |
+| no person, or ear/shoulder not visible | `none` |
+
+The median of the last 3 angles is used, so one odd frame does not flip the
+result. The nose tells which way the person faces, so it works whether they
+face left or right in the picture. Frames are only processed in memory:
+nothing is saved or sent, only `{"state", "angle"}`.
+
+```bash
+python pi/posture_ai.py                 # run (first run: downloads + exports the model, ~1 min)
+python pi/posture_ai.py --show          # + preview with skeleton and angle (Pi desktop / VNC)
+python pi/posture_ai.py --image a.jpg   # test photos, no camera or MQTT needed
+```
+
+The model lives in `models/` (not in git): `yolo11n-pose.pt` is downloaded
+once and exported to `models/yolo11n-pose_ncnn_model`, the NCNN format that
+runs fastest on the Pi 5 CPU. For the scale model we use printed side-profile
+photos: check them first with `--image` and choose one clearly upright and one
+clearly hunched photo.
+
 ### Multithreading
 
 `desk_controller.py` runs four threads (course lesson 5):
@@ -216,6 +246,10 @@ When a movement reminder or posture warning is sent, it fills the screen
 | shade (`actuators/shade_mover.py`) | Moves the stepper; a full open/close takes ~3 s |
 | ultrasonic (`sensors/ultrasonic_watcher.py`) | Measures the HC-SR04 non-stop (~5× per second); one distance takes ~0.2 s |
 | MQTT network (paho `loop_start()`) | Sends and receives; seat (Pico) and posture (`posture_ai.py`) messages arrive here |
+
+`posture_ai.py` has its own camera thread: it reads the webcam non-stop and
+keeps only the newest frame, because a webcam buffers frames and a check once
+per second would otherwise look at a picture from the past.
 
 Without the extra threads, every shade movement (3 s) and every distance
 (0.2 s) would block the main loop, and a short button press could be missed.
