@@ -1,0 +1,38 @@
+# ---------------------------------------------------------------------------
+# smartdesk-controller.service – pi/desk_controller.py as a service.
+#
+# Template: @USER@ and @REPO@ are filled in by scripts/install_services.sh.
+# Logs:     journalctl -u smartdesk-controller -f
+# ---------------------------------------------------------------------------
+[Unit]
+Description=Smart Desk controller (sensors, rules, actuators, OLED)
+Documentation=https://github.com/Dimi-TM-89/smart-desk
+PartOf=smartdesk.target
+# Works without the broker too (connect_async), but start after it when possible
+Wants=mosquitto.service
+After=mosquitto.service
+
+[Service]
+Type=simple
+# Same user as in the terminal: member of gpio, i2c and spi (sysfs PWM too)
+User=@USER@
+WorkingDirectory=@REPO@
+# The venv's python works without "source .venv/bin/activate"
+ExecStart=@REPO@/.venv/bin/python @REPO@/pi/desk_controller.py
+# Print straight to the journal (otherwise print() waits for a full buffer)
+Environment=PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8
+SyslogIdentifier=smartdesk-controller
+
+# Stop = Ctrl+C. The program cleans up in "except KeyboardInterrupt / finally":
+# shade back to open, lamp PWM off, GPIO released. The default SIGTERM would
+# skip that, and the hardware PWM lamp would stay lit after the program ends.
+KillSignal=SIGINT
+# Parking the shade takes a few seconds
+TimeoutStopSec=20
+
+# Crashed or ended? Start again after 5 s
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=smartdesk.target

@@ -1,0 +1,34 @@
+# ---------------------------------------------------------------------------
+# smartdesk-db.service – pi/db_logger.py (desk/# -> MariaDB) as a service.
+#
+# Template: @USER@ and @REPO@ are filled in by scripts/install_services.sh.
+# Logs:     journalctl -u smartdesk-db -f
+# ---------------------------------------------------------------------------
+[Unit]
+Description=Smart Desk database logger (desk/# -> MariaDB)
+Documentation=https://github.com/Dimi-TM-89/smart-desk
+PartOf=smartdesk.target
+Wants=mosquitto.service mariadb.service
+# Start after the broker and the database; at shutdown this also means the
+# logger stops first, while MariaDB can still store the last alerts
+After=mosquitto.service mariadb.service
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@REPO@
+ExecStart=@REPO@/.venv/bin/python @REPO@/pi/db_logger.py
+Environment=PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8
+SyslogIdentifier=smartdesk-db
+
+# Stop = Ctrl+C: the last alerts are written before the connection closes
+KillSignal=SIGINT
+TimeoutStopSec=10
+
+# "always", not "on-failure": without broker or database the logger ends
+# normally (exit code 0), and it must try again
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=smartdesk.target

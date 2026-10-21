@@ -12,6 +12,13 @@ source .venv/bin/activate
 python pi/tests/test_ultrasonic.py
 ```
 
+Installed the services (`scripts/install_services.sh`)? Stop them first,
+otherwise the test cannot claim the GPIO pins:
+
+```bash
+sudo systemctl stop smartdesk.target     # start again afterwards with: start
+```
+
 Stop a test with **Ctrl+C**. Each script prints what you should see and
 the most likely fix when something is wrong.
 

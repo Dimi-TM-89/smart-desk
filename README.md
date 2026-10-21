@@ -32,6 +32,8 @@ smart-desk/
 ├── db/                     # MariaDB schema + handy queries
 ├── scripts/setup_pi.sh     # One-time setup of a fresh Pi
 ├── scripts/setup_db.sh     # Creates the database, user and tables from .env
+├── scripts/install_services.sh  # Installs the programs as systemd services
+├── systemd/                # Service units (templates) + smartdesk.target
 ├── docs/                   # Report, diagrams
 ├── requirements.txt        # Pi Python packages (core)
 ├── requirements-ai.txt     # Pi Python packages (AI, large download)
@@ -65,6 +67,11 @@ smart-desk/
    ```bash
    source .venv/bin/activate
    python pi/check_setup.py
+   ```
+6. When every program runs fine by hand, install them as services so the
+   Smart Desk starts at boot (see [Running as services](#running-as-services)):
+   ```bash
+   bash scripts/install_services.sh
    ```
 
 In VS Code, select `.venv/bin/python` as the interpreter.
@@ -146,8 +153,9 @@ mosquitto_sub -h localhost -t 'desk/#' -v
 
 ## Running the Smart Desk
 
-Each program runs in its own terminal (later as a systemd service). They only
-talk to each other through the local Mosquitto broker:
+Four programs make up the Smart Desk. They only talk to each other through
+the local Mosquitto broker, so they can start in any order and each one can be
+restarted on its own. While developing, run each in its own terminal:
 
 ```bash
 python pi/desk_controller.py   # sensors, rules, actuators, OLED
@@ -155,6 +163,64 @@ python pi/posture_ai.py        # webcam → desk/posture
 python pi/cloud_bridge.py      # → ThingSpeak + ntfy
 python pi/db_logger.py         # → MariaDB
 ```
+
+### Running as services
+
+For the finished setup, systemd runs the four programs in the background:
+they start at boot, restart by themselves after a crash, and their output goes
+to the journal. One-time install (as your normal user, not with sudo):
+
+```bash
+bash scripts/install_services.sh          # --no-ai: leave the posture AI out
+sudo systemctl start smartdesk.target
+```
+
+| Service | Program | Starts after |
+|---|---|---|
+| `smartdesk-controller` | `desk_controller.py` | Mosquitto |
+| `smartdesk-posture` | `posture_ai.py` | Mosquitto, network (first model download) |
+| `smartdesk-cloud` | `cloud_bridge.py` | Mosquitto, network |
+| `smartdesk-db` | `db_logger.py` | Mosquitto, MariaDB |
+| `smartdesk.target` | the four together, started at boot | – |
+
+```bash
+sudo systemctl start smartdesk.target      # start all
+sudo systemctl stop smartdesk.target       # stop all
+sudo systemctl restart smartdesk.target    # after a git pull
+sudo systemctl restart smartdesk-posture   # one program only
+systemctl list-units 'smartdesk*'          # what runs
+journalctl -u 'smartdesk-*' -f             # live output of all four
+journalctl -u smartdesk-controller -b      # one program, since boot
+sudo systemctl disable smartdesk.target    # no longer start at boot
+bash scripts/install_services.sh --uninstall
+```
+
+How the units are set up (`systemd/`):
+
+- **Stop = Ctrl+C.** Every program cleans up in `except KeyboardInterrupt`:
+  the shade drives back to open, the lamp PWM switches off, the last alerts
+  are written to the database. systemd normally stops a program with SIGTERM,
+  which skips that cleanup (and the hardware PWM lamp would stay lit), so the
+  units use `KillSignal=SIGINT`: systemd presses Ctrl+C for us.
+- **`Restart=always`.** Without broker or database, `cloud_bridge.py` and
+  `db_logger.py` end normally (exit code 0); they must still try again.
+  The posture AI retries every 10 s, e.g. until the webcam is plugged in.
+- **`PYTHONUNBUFFERED=1`**, otherwise `print()` waits for a full buffer and
+  the journal stays empty.
+- **`Nice=5`** for the posture AI: the controller (buttons, stepper) gets the
+  CPU first.
+- The services run as your own user, from `.venv/bin/python`, with the repo
+  as working directory; `config.py` reads `.env` itself. The unit files in
+  `systemd/` are templates: `install_services.sh` fills in user and path.
+
+> **Stop the services before you run a program or test by hand**
+> (`sudo systemctl stop smartdesk.target`). Two programs cannot claim the same
+> GPIO pins, and two clients with the same MQTT client ID keep kicking each
+> other off the broker. The same goes for `simulate_desk.py`.
+>
+> `desk_controller.py` measures the empty entrance at startup (ultrasonic
+> baseline). After a reboot or restart, keep the entrance of the model clear
+> for a moment.
 
 Without hardware, `python pi/tests/simulate_desk.py --alert` stands in for the
 first two, so the cloud bridge and the database can be tested on their own.

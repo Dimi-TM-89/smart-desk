@@ -1,0 +1,32 @@
+# ---------------------------------------------------------------------------
+# smartdesk-cloud.service – pi/cloud_bridge.py (ThingSpeak + ntfy) as a service.
+#
+# Template: @USER@ and @REPO@ are filled in by scripts/install_services.sh.
+# Logs:     journalctl -u smartdesk-cloud -f
+# ---------------------------------------------------------------------------
+[Unit]
+Description=Smart Desk cloud bridge (desk/# -> ThingSpeak, alerts -> ntfy)
+Documentation=https://github.com/Dimi-TM-89/smart-desk
+PartOf=smartdesk.target
+Wants=mosquitto.service network-online.target
+After=mosquitto.service network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@REPO@
+ExecStart=@REPO@/.venv/bin/python @REPO@/pi/cloud_bridge.py
+Environment=PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8
+SyslogIdentifier=smartdesk-cloud
+
+# Stop = Ctrl+C: both MQTT connections closed cleanly
+KillSignal=SIGINT
+TimeoutStopSec=10
+
+# "always", not "on-failure": without a broker the bridge ends normally
+# (exit code 0), and it must try again until Mosquitto is there
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=smartdesk.target

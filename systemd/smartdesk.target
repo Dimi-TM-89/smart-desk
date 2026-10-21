@@ -1,0 +1,21 @@
+# ---------------------------------------------------------------------------
+# smartdesk.target – The whole Smart Desk as one unit.
+#
+# Groups the four programs, so they start, stop and restart together:
+#   sudo systemctl start   smartdesk.target
+#   sudo systemctl stop    smartdesk.target
+#   sudo systemctl restart smartdesk.target
+#
+# Each smartdesk-*.service has "WantedBy=smartdesk.target" (start with the
+# group) and "PartOf=smartdesk.target" (stop/restart with the group). A single
+# program can still be left out: sudo systemctl disable smartdesk-posture
+#
+# Installed by scripts/install_services.sh.
+# ---------------------------------------------------------------------------
+[Unit]
+Description=Smart Desk (controller, posture AI, cloud bridge, database logger)
+Documentation=https://github.com/Dimi-TM-89/smart-desk
+
+[Install]
+# Start the Smart Desk at boot
+WantedBy=multi-user.target

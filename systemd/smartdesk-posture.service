@@ -1,0 +1,41 @@
+# ---------------------------------------------------------------------------
+# smartdesk-posture.service – pi/posture_ai.py (webcam + YOLO pose) as a service.
+#
+# Template: @USER@ and @REPO@ are filled in by scripts/install_services.sh.
+# Logs:     journalctl -u smartdesk-posture -f
+#
+# Run "python pi/posture_ai.py" once by hand first: the first run downloads
+# the model and exports it to models/yolo11n-pose_ncnn_model.
+# ---------------------------------------------------------------------------
+[Unit]
+Description=Smart Desk posture AI (webcam -> desk/posture)
+Documentation=https://github.com/Dimi-TM-89/smart-desk
+PartOf=smartdesk.target
+Wants=mosquitto.service network-online.target
+# network-online: only needed if the model still has to be downloaded
+After=mosquitto.service network-online.target
+
+[Service]
+Type=simple
+# Member of the video group (webcam)
+User=@USER@
+WorkingDirectory=@REPO@
+# No --show: a service has no screen
+ExecStart=@REPO@/.venv/bin/python @REPO@/pi/posture_ai.py
+Environment=PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8
+SyslogIdentifier=smartdesk-posture
+
+# The AI is the heaviest program: give the controller (buttons, stepper)
+# priority on the CPU. One posture check per second still keeps up easily.
+Nice=5
+
+# Stop = Ctrl+C: camera released, MQTT disconnected cleanly
+KillSignal=SIGINT
+TimeoutStopSec=10
+
+# Webcam unplugged or not found: try again every 10 s
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=smartdesk.target
