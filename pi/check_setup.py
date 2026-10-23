@@ -183,28 +183,39 @@ def _active_config_lines():
     ]
 
 
-def shade_button_pin():
-    """GPIO7 is free for the shade button: SPI0 keeps only CE0 (dtoverlay=spi0-1cs)."""
-    if "dtoverlay=spi0-1cs" not in _active_config_lines():
-        raise RuntimeError("dtoverlay=spi0-1cs missing in /boot/firmware/config.txt – "
-                           "run scripts/setup_pi.sh again and reboot (SPI0 still claims GPIO7)")
+def shade_button_pins():
+    """GPIO8 and GPIO7 are free for the shade buttons: SPI0 claims no CS pin (dtoverlay=spi0-0cs)."""
+    lines = _active_config_lines()
+    if "dtoverlay=spi0-1cs" in lines:
+        raise RuntimeError("the old dtoverlay=spi0-1cs is still in /boot/firmware/config.txt (it keeps "
+                           "GPIO8 for SPI0) – run scripts/setup_pi.sh again and reboot")
+    if "dtoverlay=spi0-0cs" not in lines:
+        raise RuntimeError("dtoverlay=spi0-0cs missing in /boot/firmware/config.txt – "
+                           "run scripts/setup_pi.sh again and reboot (SPI0 still claims GPIO7/8)")
 
-    # The file is fine; the pin is only released after a reboot
+    # The file is fine; the pins are only released after a reboot
     import digitalio
 
     sys.path.insert(0, str(REPO_ROOT / "pi"))
+    import config
     from hardware import board_pin
 
-    try:
-        pin = digitalio.DigitalInOut(board_pin(7))
-    except Exception as exc:  # noqa: BLE001 – lgpio says "GPIO busy"
-        raise RuntimeError(f"GPIO7 is still in use ({exc}) – reboot the Pi") from exc
-    try:
-        pin.switch_to_input(pull=digitalio.Pull.UP)
-        pressed = not pin.value
-    finally:
-        pin.deinit()
-    return "GPIO7 free" + (" – it reads LOW: button held down, or wired to GND directly?" if pressed else "")
+    held = []
+    for name, gpio in (("up", config.Pins.SHADE_UP_BUTTON), ("down", config.Pins.SHADE_DOWN_BUTTON)):
+        try:
+            pin = digitalio.DigitalInOut(board_pin(gpio))
+        except Exception as exc:  # noqa: BLE001 – lgpio says "GPIO busy"
+            raise RuntimeError(f"GPIO{gpio} ({name}) is still in use ({exc}) – reboot the Pi") from exc
+        try:
+            pin.switch_to_input(pull=digitalio.Pull.UP)
+            if not pin.value:
+                held.append(f"GPIO{gpio}")
+        finally:
+            pin.deinit()
+    detail = f"up GPIO{config.Pins.SHADE_UP_BUTTON}, down GPIO{config.Pins.SHADE_DOWN_BUTTON} free"
+    if held:
+        detail += f" – {', '.join(held)} reads LOW: button held down, or wired to GND directly?"
+    return detail
 
 
 def hardware_pwm():
@@ -239,7 +250,7 @@ if __name__ == "__main__":
     check("I2C / SPI0 / SPI1 enabled", interfaces)
     check("Hardware PWM GPIO12", hardware_pwm)
     check("Serial port off (GPIO14/15)", serial_port_off)
-    check("Shade button pin free (GPIO7)", shade_button_pin)
+    check("Shade button pins free (GPIO7/8)", shade_button_pins)
     check("I2C scan", i2c_devices)
     check("Mosquitto broker", mqtt_broker)
     check(".env file", env_file)

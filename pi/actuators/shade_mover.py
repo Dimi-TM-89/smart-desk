@@ -18,7 +18,7 @@ How the two threads work together:
                                            it in chunks of CHUNK half steps.
     mover.percent       <-- position --    After every chunk (~40 ms) it looks
       (for desk/actuators)                 at the target again, so a new
-                                           command (the shade button!) takes
+                                           command (a shade button!) takes
                                            effect at once, even halfway.
 
     The target is written by the main thread and read by the shade thread,

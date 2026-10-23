@@ -28,10 +28,11 @@ Layer 2 – climate rules (every SENSOR_INTERVAL_S, after the sensor reading):
     Fan        (relay GPIO16)   on above FAN_ON_ABOVE, off below FAN_OFF_BELOW
     Sunshade   (stepper)        closes above SHADE_CLOSE_ABOVE % window light,
                                 opens below SHADE_OPEN_BELOW %
-    Fan button (GPIO25) and shade button (GPIO7) toggle their part by hand.
+    Fan button (GPIO25) toggles the fan by hand. The shade has two buttons:
+    up (GPIO8) opens it, down (GPIO7) closes it.
     The manual state holds until the automatic rule itself changes its mind
-    (the sun goes away, the room cools down), or until the button is pressed
-    again: then the rule is in charge again.
+    (the sun goes away, the room cools down), or until a button puts the part
+    back where the rule wants it anyway: then the rule is in charge again.
 The states are published on desk/actuators: {"lamp": 40, "fan": true, "shade": 100}
 
 Layer 3 – presence and seat:
@@ -66,8 +67,8 @@ Layer 4 – posture and OLED:
 Multithreading – this program runs four threads:
     main thread    buttons (20x per second), sensors and rules (every second)
     shade          actuators/shade_mover.py: the stepper needs ~3 s for a full
-                   movement; the main thread only sets a target. A button press
-                   during a movement turns the shade around at once.
+                   movement; the main thread only sets a target. Pressing the
+                   other shade button during a movement turns it around at once.
     ultrasonic     sensors/ultrasonic_watcher.py: one distance takes ~0.2 s, so
                    it is measured non-stop in the background (~5x per second)
                    and the main thread only reads the newest value.
@@ -176,10 +177,11 @@ class Hysteresis:
 class ManualOverride:
     """Button override on top of an automatic on/off rule.
 
-    A press flips the output and holds it, until either
+    A button sets the output and holds it, until either
       - the automatic rule changes its mind (e.g. the sun goes away), or
-      - the button flips it back to what the rule wants anyway.
+      - a button sets it back to what the rule wants anyway.
     After that the rule decides again.
+    Fan: one toggle button (press). Shade: an up and a down button (set).
     """
 
     def __init__(self):
@@ -189,8 +191,11 @@ class ManualOverride:
         self._auto_at_press = None
 
     def press(self, auto, current):
-        """The button was pressed: return the new output (the opposite of current)."""
-        new = not current
+        """A toggle button was pressed: return the new output (the opposite of current)."""
+        return self.set(auto, not current)
+
+    def set(self, auto, new):
+        """A button asks for output `new` (e.g. shade up/down): return it."""
         if new == auto:
             self.active = False                 # back to what the rule wants: automatic again
         else:
@@ -256,8 +261,9 @@ class DeskController:
         self.fan_button = None      # Button
         self.shade = None           # ShadeMover (the Shade runs in its own thread)
         self._stepper = None        # the Shade itself, released at the end
-        self.shade_button = None    # Button
-        self.rgb = None             # RgbLed (posture feedback)
+        self.shade_up_button = None     # Button (opens the shade)
+        self.shade_down_button = None   # Button (closes the shade)
+        self.rgb = None            # RgbLed (posture feedback)
         self.oled = None            # Oled (local dashboard)
 
         # Layer 2 rules
@@ -353,10 +359,12 @@ class DeskController:
             self._stepper = shade
             self.shade = ShadeMover(shade)       # starts the shade thread
             print("        runs in its own thread; assumes the shade is OPEN now")
-        self.shade_button = self._try(f"Shade button (GPIO{P.SHADE_BUTTON})",
-                                      lambda: Button(P.SHADE_BUTTON))
-        if self.shade_button is None:
-            print("        GPIO7 is freed by dtoverlay=spi0-1cs + reboot (scripts/setup_pi.sh)")
+        self.shade_up_button = self._try(f"Shade up button (GPIO{P.SHADE_UP_BUTTON})",
+                                         lambda: Button(P.SHADE_UP_BUTTON))
+        self.shade_down_button = self._try(f"Shade down button (GPIO{P.SHADE_DOWN_BUTTON})",
+                                           lambda: Button(P.SHADE_DOWN_BUTTON))
+        if self.shade_up_button is None or self.shade_down_button is None:
+            print("        GPIO7/8 are freed by dtoverlay=spi0-0cs + reboot (scripts/setup_pi.sh)")
 
         self.rgb = self._try(f"RGB posture LED (GPIO {P.RGB_RED}/{P.RGB_GREEN}/{P.RGB_BLUE})",
                              lambda: RgbLed(P.RGB_RED, P.RGB_GREEN, P.RGB_BLUE))
@@ -477,16 +485,22 @@ class DeskController:
         self._set_shade(want, "manual" if self.shade_override.active else f"window light {window} %")
 
     def poll_buttons(self):
-        """Handle a press on the fan or shade button (called 20x per second)."""
+        """Handle a press on the fan button or a shade button (called 20x per second)."""
         if self.fan_button is not None and self.fan is not None and self.fan_button.was_pressed():
             self.activity("fan button")
             on = self.fan_override.press(self.fan_rule.state, self.fan.is_on)
             self._set_fan(on, "button, " + ("manual" if self.fan_override.active else "automatic again"))
 
-        if self.shade_button is not None and self.shade is not None and self.shade_button.was_pressed():
-            self.activity("shade button")
-            closed = self.shade_override.press(self.shade_rule.state, self.shade_closed)
-            self._set_shade(closed, "button, " + ("manual" if self.shade_override.active else "automatic again"))
+        # Up opens, down closes. Pressing the button for the way the shade is
+        # already going (or already is) changes nothing; the other button turns
+        # it around at once, also halfway a movement.
+        for button, closed, name in ((self.shade_up_button, False, "up"),
+                                     (self.shade_down_button, True, "down")):
+            if button is not None and button.was_pressed() and self.shade is not None:
+                self.activity(f"shade {name} button")
+                self.shade_override.set(self.shade_rule.state, closed)
+                mode = "manual" if self.shade_override.active else "automatic again"
+                self._set_shade(closed, f"{name} button, {mode}")
 
     def fade_lamp(self, dt):
         """Move the lamp towards lamp_target at LAMP_FADE_PER_S, so it never jumps."""
@@ -743,8 +757,8 @@ class DeskController:
                 print("  the shade thread did not finish in time – jog the shade back to open")
         if self.ultrasonic is not None:
             self.ultrasonic.stop()                   # ends the ultrasonic thread
-        for part in (self.lamp, self.fan, self._stepper, self.fan_button, self.shade_button,
-                     self.rgb, self.oled, self.adc, self._sonar):
+        for part in (self.lamp, self.fan, self._stepper, self.fan_button,
+                     self.shade_up_button, self.shade_down_button, self.rgb, self.oled, self.adc, self._sonar):
             if part is not None:
                 try:
                     part.deinit()

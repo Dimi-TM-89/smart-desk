@@ -103,7 +103,7 @@ All pin numbers (BCM) live in [`pi/config.py`](pi/config.py). Change them
 | Ultrasonic TRIG / ECHO | 14 / 15 |
 | Fan relay | 16 |
 | Fan button | 25 |
-| Shade button | 7 |
+| Shade up / down buttons | 8 / 7 |
 
 Pico: seat button on **GP15** (to GND, internal pull-up).
 
@@ -115,9 +115,11 @@ only offers software-timed PWM (`lgpio.tx_pwm`), and it cannot claim a pin the
 overlay owns. GPIO13 stays a plain output for the RGB LED.
 
 SPI0 normally claims two chip-select pins, GPIO8 and GPIO7. The MCP3008 uses
-its own CS (GPIO24), so the setup script adds `dtoverlay=spi0-1cs`: SPI0 then
-keeps only GPIO8, and GPIO7 is free for the shade button. `check_setup.py`
-checks that GPIO7 can be claimed.
+its own CS (GPIO24), so the setup script adds `dtoverlay=spi0-0cs`: SPI0 then
+claims neither, and GPIO8 / GPIO7 are free for the shade up / down buttons.
+(An older version of the script added `spi0-1cs`, which keeps GPIO8; running
+the script again comments it out.) `check_setup.py` checks that both pins can
+be claimed.
 
 The OLED module has no CS pin, so it cannot share SPI0 with the MCP3008. It
 runs on SPI1 (`dtoverlay=spi1-1cs`, also set by the setup script). That
@@ -231,7 +233,7 @@ first two, so the cloud bridge and the database can be tested on their own.
 |---|---|---|
 | Desk lamp (PWM) | Closed loop: dims up until the BH1750 reaches the threshold set with the potentiometer, dims down when daylight comes back | – |
 | Fan (relay) | On above 25 °C, off below 24 °C | GPIO25 toggles it |
-| Sunshade (stepper) | Closes above 70 % window light, opens below 50 % | GPIO7 toggles it, also while it moves |
+| Sunshade (stepper) | Closes above 70 % window light, opens below 50 % | GPIO8 opens it (up), GPIO7 closes it (down), also while it moves |
 
 A button press holds until the automatic rule changes its mind (the sun goes
 away, the room cools down) or until the button is pressed again; then the rule

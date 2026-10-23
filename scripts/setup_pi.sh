@@ -5,7 +5,7 @@
 # Follows the installation steps from the IoT Essentials course:
 #   - system packages (Python, lgpio, PIL, MariaDB, Mosquitto, I2C tools)
 #   - enables I2C, SPI0, SPI1 (OLED) and hardware PWM on GPIO12
-#   - lets SPI0 keep only one CS pin, so GPIO7 is free for the shade button
+#   - lets SPI0 claim no CS pin, so GPIO8/7 are free for the shade up/down buttons
 #   - switches the serial port off, so GPIO14/15 are free for the HC-SR04
 #   - creates the virtual environment .venv (with --system-site-packages)
 #   - installs the Python packages from requirements*.txt
@@ -35,10 +35,12 @@ sudo raspi-config nonint do_spi 0
 
 CONFIG_TXT=/boot/firmware/config.txt
 
-echo "==> SPI0 with one CS pin only (GPIO8), so GPIO7 is free for the shade button"
+echo "==> SPI0 without CS pins, so GPIO8 and GPIO7 are free for the shade buttons"
 # The MCP3008 uses its own CS (GPIO24), so SPI0 needs neither CE0 nor CE1.
-if ! grep -q "^dtoverlay=spi0-1cs" "$CONFIG_TXT"; then
-    echo "dtoverlay=spi0-1cs" | sudo tee -a "$CONFIG_TXT" > /dev/null
+# An older version of this script added spi0-1cs (keeps GPIO8): switch it off.
+sudo sed -i -E 's/^dtoverlay=spi0-1cs$/#&/' "$CONFIG_TXT"
+if ! grep -q "^dtoverlay=spi0-0cs" "$CONFIG_TXT"; then
+    echo "dtoverlay=spi0-0cs" | sudo tee -a "$CONFIG_TXT" > /dev/null
 fi
 
 echo "==> Enabling SPI1 for the OLED (GPIO 21/20, module without CS pin)"
