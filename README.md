@@ -34,7 +34,7 @@ smart-desk/
 ├── scripts/setup_db.sh     # Creates the database, user and tables from .env
 ├── scripts/install_services.sh  # Installs the programs as systemd services
 ├── systemd/                # Service units (templates) + smartdesk.target
-├── docs/                   # Report, diagrams
+├── docs/                   # Report, diagrams, make_code_appendix.py (code → report)
 ├── requirements.txt        # Pi Python packages (core)
 ├── requirements-ai.txt     # Pi Python packages (AI, large download)
 └── .env.example            # Template for secrets → copy to .env
