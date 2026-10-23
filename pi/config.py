@@ -58,7 +58,7 @@ class Pins:
 
     # Stepper motor 28BYJ-48 via ULN2003
     STEPPER = (17, 27, 22, 23)   # IN1, IN2, IN3, IN4
-    STEPPER_REVERSE = False      # True if the shade moves the wrong way (test_stepper.py --reverse)
+    STEPPER_REVERSE = True     # True if the shade moves the wrong way (test_stepper.py --reverse)
 
     # Shade button: toggles the sunshade open/closed. GPIO7 is SPI0 CE1; the
     # overlay dtoverlay=spi0-1cs (setup_pi.sh) lets SPI0 keep only CE0 (GPIO8),
@@ -111,7 +111,7 @@ class Limits:
     # Window light (0–100 %) with hysteresis so the shade does not flutter
     SHADE_CLOSE_ABOVE = 70
     SHADE_OPEN_BELOW = 50
-    SHADE_STEPS = 2048       # steps for a fully closed shade (half a turn)
+    SHADE_STEPS = 7150       # steps for a fully closed shade (half a turn)
 
     # Temperature (°C) with 1 °C hysteresis
     FAN_ON_ABOVE = 25.0
