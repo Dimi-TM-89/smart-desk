@@ -29,7 +29,7 @@ Layer 2 – climate rules (every SENSOR_INTERVAL_S, after the sensor reading):
     Sunshade   (stepper)        closes above SHADE_CLOSE_ABOVE % window light,
                                 opens below SHADE_OPEN_BELOW %
     Fan button (GPIO25) toggles the fan by hand. The shade has two buttons:
-    up (GPIO8) opens it, down (GPIO7) closes it.
+    up (GPIO7) opens it, down (GPIO8) closes it.
     The manual state holds until the automatic rule itself changes its mind
     (the sun goes away, the room cools down), or until a button puts the part
     back where the rule wants it anyway: then the rule is in charge again.

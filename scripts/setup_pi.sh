@@ -5,7 +5,7 @@
 # Follows the installation steps from the IoT Essentials course:
 #   - system packages (Python, lgpio, PIL, MariaDB, Mosquitto, I2C tools)
 #   - enables I2C, SPI0, SPI1 (OLED) and hardware PWM on GPIO12
-#   - lets SPI0 claim no CS pin, so GPIO8/7 are free for the shade up/down buttons
+#   - lets SPI0 claim no CS pin, so GPIO7/8 are free for the shade up/down buttons
 #   - switches the serial port off, so GPIO14/15 are free for the HC-SR04
 #   - creates the virtual environment .venv (with --system-site-packages)
 #   - installs the Python packages from requirements*.txt

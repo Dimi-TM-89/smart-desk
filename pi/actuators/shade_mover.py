@@ -5,7 +5,7 @@ course lesson 5).
 Why a thread?
     Shade.move_to() blocks: a full open/close is 2048 half steps of 1.2 ms,
     about 3 seconds. In the main loop of desk_controller.py that would freeze
-    the sensors, both buttons, the lamp and (later) the OLED during every
+    the sensors, the fan and shade buttons, the lamp and the OLED during every
     movement. With this class the main loop only says WHERE the shade has to
     go; a separate thread does the stepping.
 

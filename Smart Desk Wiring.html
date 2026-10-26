@@ -161,6 +161,7 @@ g.mp.hi .ring { opacity: 1; }
         <li>GPIO18 and GPIO19 now belong to SPI1: leave them free.</li>
         <li>16 October: new <b>shade button</b> on pin 26 (GPIO7), other leg to GND on pin 25.</li>
         <li>23 October: <b>two shade buttons</b>: up (opens) on pin 24 (GPIO8), down (closes) on pin 26 (GPIO7). The existing button on pin 26 becomes "down". Run <code>setup_pi.sh</code> again: it swaps <code>dtoverlay=spi0-1cs</code> for <code>dtoverlay=spi0-0cs</code>. Then reboot.</li>
+        <li>26 October: shade buttons <b>swapped in the code</b>: up (opens) is now pin 26 (GPIO7), down (closes) is pin 24 (GPIO8). No rewiring needed.</li>
       </ul>
     </div>
   </header>
@@ -238,7 +239,7 @@ g.mp.hi .ring { opacity: 1; }
     7: "OLED RES", 31: "OLED DC", 38: "OLED SDA (SPI1 data)", 40: "OLED SCL (SPI1 clock)",
     23: "SPI0 SCLK → MCP3008", 19: "SPI0 MOSI → MCP3008", 21: "SPI0 MISO ← MCP3008", 18: "MCP3008 CS",
     32: "Desk lamp (PWM)", 33: "RGB red", 29: "RGB green", 37: "RGB blue",
-    36: "Fan relay IN1", 22: "Fan button", 24: "Shade up button", 26: "Shade down button", 25: "GND for the shade buttons",
+    36: "Fan relay IN1", 22: "Fan button", 24: "Shade down button", 26: "Shade up button", 25: "GND for the shade buttons",
     11: "Stepper IN1", 13: "Stepper IN2", 15: "Stepper IN3", 16: "Stepper IN4",
     8: "HC-SR04 TRIG", 10: "HC-SR04 ECHO"
   };
@@ -443,15 +444,15 @@ g.mp.hi .ring { opacity: 1; }
           { from: "−", to: { rail: "gnd" }, wire: "black" },
           { from: "motor plug", to: { open: "white socket on the board, fits one way" } } ] },
         { title: "Shade up button (opens)", rows: [
-          { from: "leg A", to: { pi: 24 }, wire: "green" },
-          { from: "leg B (diagonal)", to: { rail: "gnd" }, wire: "black" } ] },
-        { title: "Shade down button (closes)", rows: [
           { from: "leg A", to: { pi: 26 }, wire: "green" },
-          { from: "leg B (diagonal)", to: { pi: 25 }, wire: "black", note: "GND right next to it" } ] }
+          { from: "leg B (diagonal)", to: { pi: 25 }, wire: "black", note: "GND right next to it" } ] },
+        { title: "Shade down button (closes)", rows: [
+          { from: "leg A", to: { pi: 24 }, wire: "green" },
+          { from: "leg B (diagonal)", to: { rail: "gnd" }, wire: "black" } ] }
       ],
       before: [
         "IN1–IN4 in this exact order. A wrong order makes the motor buzz without turning.",
-        "Shade buttons: GPIO8 and GPIO7 belong to SPI0 until <code>dtoverlay=spi0-0cs</code> is in <code>/boot/firmware/config.txt</code> (and the old <code>spi0-1cs</code> is gone) and the Pi has rebooted. <code>python pi/check_setup.py</code> shows \"up GPIO8, down GPIO7 free\" when it is ready. Same diagonal-leg rule as the fan button, no resistor (internal pull-up).",
+        "Shade buttons: GPIO8 and GPIO7 belong to SPI0 until <code>dtoverlay=spi0-0cs</code> is in <code>/boot/firmware/config.txt</code> (and the old <code>spi0-1cs</code> is gone) and the Pi has rebooted. <code>python pi/check_setup.py</code> shows \"up GPIO7, down GPIO8 free\" when it is ready. Same diagonal-leg rule as the fan button, no resistor (internal pull-up).",
         "The board needs 5 V on +; the motor will not run on 3.3 V.",
         "The ON/OFF jumper on the board must be on."
       ],

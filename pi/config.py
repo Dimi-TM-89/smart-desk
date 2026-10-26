@@ -60,12 +60,12 @@ class Pins:
     STEPPER = (17, 27, 22, 23)   # IN1, IN2, IN3, IN4
     STEPPER_REVERSE = True     # True if the shade moves the wrong way (test_stepper.py --reverse)
 
-    # Shade buttons: one opens (up), one closes (down). GPIO8 and GPIO7 are the
-    # SPI0 chip selects CE0 and CE1; the overlay dtoverlay=spi0-0cs (setup_pi.sh)
+    # Shade buttons: one opens (up), one closes (down). GPIO7 and GPIO8 are the
+    # SPI0 chip selects CE1 and CE0; the overlay dtoverlay=spi0-0cs (setup_pi.sh)
     # makes SPI0 claim neither, because the MCP3008 has its own CS on GPIO24.
     # Swap the two numbers if the buttons are the other way round on the model.
-    SHADE_UP_BUTTON = 8      # to GND, internal pull-up (header pin 24)
-    SHADE_DOWN_BUTTON = 7    # to GND, internal pull-up (header pin 26, GND on pin 25)
+    SHADE_UP_BUTTON = 7      # to GND, internal pull-up (header pin 26, GND on pin 25)
+    SHADE_DOWN_BUTTON = 8    # to GND, internal pull-up (header pin 24)
 
     # Ultrasonic sensor HC-SR04, powered from 3.3 V: ECHO goes straight to the GPIO
     # GPIO14/15 are the UART pins: the serial port must be off (setup_pi.sh,

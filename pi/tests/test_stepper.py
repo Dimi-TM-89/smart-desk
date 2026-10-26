@@ -4,7 +4,7 @@ test_stepper.py – Test the sunshade stepper (28BYJ-48 + ULN2003 on GPIO 17/27/
     python pi/tests/test_stepper.py            close, wait, open (full movement)
     python pi/tests/test_stepper.py --jog 200  move 200 half steps (negative = other way)
     python pi/tests/test_stepper.py --reverse  same test with the direction reversed
-    python pi/tests/test_stepper.py --button   shade buttons (up GPIO8, down GPIO7) +
+    python pi/tests/test_stepper.py --button   shade buttons (up GPIO7, down GPIO8) +
                                                shade thread: up opens, down closes,
                                                also while the shade is still moving
 
